@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "IDPhoto Pro";
+"NSCameraUsageDescription" = "Nehmen Sie ein Foto für Pass- und Visafotos auf.";
+"NSPhotoLibraryUsageDescription" = "Importieren Sie ein Foto, um Pass- oder Visabilder zuzuschneiden und zu exportieren.";
+"NSPhotoLibraryAddUsageDescription" = "Speichern Sie exportierte Digitalfotos und Druckbögen in Ihrer Fotomediathek.";

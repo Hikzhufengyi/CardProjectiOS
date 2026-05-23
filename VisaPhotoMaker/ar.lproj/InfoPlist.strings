@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "IDPhoto Pro";
+"NSCameraUsageDescription" = "التقط صورة لإنشاء صور جواز سفر وتأشيرة.";
+"NSPhotoLibraryUsageDescription" = "استورد صورة لقصها وتصدير صور جواز السفر أو التأشيرة.";
+"NSPhotoLibraryAddUsageDescription" = "احفظ الصور الرقمية وتخطيطات الطباعة المصدرة في مكتبة الصور.";

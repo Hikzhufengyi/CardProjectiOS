@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "IDPhoto Pro";
+"NSCameraUsageDescription" = "Tire uma foto para criar fotos de passaporte e visto.";
+"NSPhotoLibraryUsageDescription" = "Importe uma foto para cortar e exportar imagens de passaporte ou visto.";
+"NSPhotoLibraryAddUsageDescription" = "Salve fotos digitais exportadas e folhas de impressão na sua fototeca.";

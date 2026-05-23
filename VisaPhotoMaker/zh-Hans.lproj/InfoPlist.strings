@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "IDPhoto Pro";
+"NSCameraUsageDescription" = "用于拍摄护照、签证和证件照。";
+"NSPhotoLibraryUsageDescription" = "用于导入照片并裁剪、检测和导出证件照。";
+"NSPhotoLibraryAddUsageDescription" = "用于保存导出的电子证件照和打印排版图。";

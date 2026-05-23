@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "IDPhoto Pro";
+"NSCameraUsageDescription" = "パスポートやビザ用写真を作成するために写真を撮影します。";
+"NSPhotoLibraryUsageDescription" = "写真を読み込み、パスポートやビザ用画像を切り抜いて書き出します。";
+"NSPhotoLibraryAddUsageDescription" = "書き出したデジタル写真と印刷シートを写真ライブラリに保存します。";

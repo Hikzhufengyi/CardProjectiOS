@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "IDPhoto Pro";
+"NSCameraUsageDescription" = "여권 및 비자 사진 제작을 위해 사진을 촬영합니다.";
+"NSPhotoLibraryUsageDescription" = "사진을 가져와 여권 또는 비자 이미지를 자르고 내보냅니다.";
+"NSPhotoLibraryAddUsageDescription" = "내보낸 디지털 사진과 인쇄 시트를 사진 보관함에 저장합니다.";
