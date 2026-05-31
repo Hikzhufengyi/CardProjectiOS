@@ -19,16 +19,14 @@ struct BackgroundRemovalService {
             throw BackgroundRemovalError.missingCGImage
         }
 
-        let mask = try await generateMask(for: cgImage)
         let input = CIImage(cgImage: cgImage)
         let transparentBackground = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
             .cropped(to: input.extent)
-
-        let scaledMask = refinedMask(mask.transformed(by: maskTransform(maskExtent: mask.extent, targetExtent: input.extent)), extent: input.extent)
+        let mask = try await generateBestMask(for: cgImage, targetExtent: input.extent)
         let blend = CIFilter.blendWithMask()
         blend.inputImage = input
         blend.backgroundImage = transparentBackground
-        blend.maskImage = scaledMask
+        blend.maskImage = mask
 
         guard let output = blend.outputImage,
               let outputCG = context.createCGImage(output, from: input.extent) else {
@@ -43,16 +41,14 @@ struct BackgroundRemovalService {
             throw BackgroundRemovalError.missingCGImage
         }
 
-        let mask = try await generateMask(for: cgImage)
         let input = CIImage(cgImage: cgImage)
         let backgroundImage = CIImage(color: CIColor(color: UIColor(background.color)))
             .cropped(to: input.extent)
-
-        let scaledMask = refinedMask(mask.transformed(by: maskTransform(maskExtent: mask.extent, targetExtent: input.extent)), extent: input.extent)
+        let mask = try await generateBestMask(for: cgImage, targetExtent: input.extent)
         let blend = CIFilter.blendWithMask()
         blend.inputImage = input
         blend.backgroundImage = backgroundImage
-        blend.maskImage = scaledMask
+        blend.maskImage = mask
 
         guard let output = blend.outputImage,
               let outputCG = context.createCGImage(output, from: input.extent) else {
@@ -62,7 +58,53 @@ struct BackgroundRemovalService {
         return UIImage(cgImage: outputCG, scale: image.scale, orientation: .up)
     }
 
-    private nonisolated func generateMask(for cgImage: CGImage) async throws -> CIImage {
+    private func generateBestMask(for cgImage: CGImage, targetExtent: CGRect) async throws -> CIImage {
+        async let foregroundMask = try? generateForegroundInstanceMask(for: cgImage)
+        async let personMask = try? generatePersonSegmentationMask(for: cgImage)
+
+        let foreground = await foregroundMask
+        let person = await personMask
+
+        if let foreground, let person {
+            let combined = combinedMask(
+                resizedMask(foreground, targetExtent: targetExtent),
+                resizedMask(person, targetExtent: targetExtent),
+                extent: targetExtent
+            )
+            return refinedMask(combined, extent: targetExtent)
+        }
+
+        if let foreground {
+            return refinedMask(resizedMask(foreground, targetExtent: targetExtent), extent: targetExtent)
+        }
+
+        if let person {
+            return refinedMask(resizedMask(person, targetExtent: targetExtent), extent: targetExtent)
+        }
+
+        throw BackgroundRemovalError.missingMask
+    }
+
+    private nonisolated func generateForegroundInstanceMask(for cgImage: CGImage) async throws -> CIImage {
+        try await Task.detached(priority: .userInitiated) {
+            let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up)
+            let request = VNGenerateForegroundInstanceMaskRequest()
+            try handler.perform([request])
+
+            guard let observation = request.results?.first,
+                  !observation.allInstances.isEmpty else {
+                throw BackgroundRemovalError.missingMask
+            }
+
+            let scaledMask = try observation.generateScaledMaskForImage(
+                forInstances: observation.allInstances,
+                from: handler
+            )
+            return CIImage(cvPixelBuffer: scaledMask)
+        }.value
+    }
+
+    private nonisolated func generatePersonSegmentationMask(for cgImage: CGImage) async throws -> CIImage {
         try await Task.detached(priority: .userInitiated) {
             let request = VNGeneratePersonSegmentationRequest()
             request.qualityLevel = .accurate
@@ -85,23 +127,77 @@ struct BackgroundRemovalService {
         return CGAffineTransform(scaleX: scaleX, y: scaleY)
     }
 
-    private func refinedMask(_ mask: CIImage, extent: CGRect) -> CIImage {
-        let clamped = mask.clampedToExtent()
+    private func resizedMask(_ mask: CIImage, targetExtent: CGRect) -> CIImage {
+        guard mask.extent.size != targetExtent.size else {
+            return mask.cropped(to: targetExtent)
+        }
+        return mask
+            .transformed(by: maskTransform(maskExtent: mask.extent, targetExtent: targetExtent))
+            .cropped(to: targetExtent)
+    }
 
-        let maximum = CIFilter.morphologyMaximum()
-        maximum.inputImage = clamped
-        maximum.radius = 1.2
+    private func combinedMask(_ foreground: CIImage, _ person: CIImage, extent: CGRect) -> CIImage {
+        let foregroundPrepared = preparedMask(foreground, extent: extent)
+        let personPrepared = preparedMask(person, extent: extent)
+
+        if let maximum = CIFilter(name: "CIMaximumCompositing") {
+            maximum.setValue(foregroundPrepared, forKey: kCIInputImageKey)
+            maximum.setValue(personPrepared, forKey: kCIInputBackgroundImageKey)
+            return (maximum.outputImage ?? foregroundPrepared).cropped(to: extent)
+        }
+
+        return foregroundPrepared.cropped(to: extent)
+    }
+
+    private func preparedMask(_ mask: CIImage, extent: CGRect) -> CIImage {
+        let controls = CIFilter.colorControls()
+        controls.inputImage = mask.cropped(to: extent)
+        controls.saturation = 0
+        controls.contrast = 1.08
+        controls.brightness = 0
+        return (controls.outputImage ?? mask).cropped(to: extent)
+    }
+
+    private func refinedMask(_ mask: CIImage, extent: CGRect) -> CIImage {
+        let clamped = preparedMask(mask, extent: extent).clampedToExtent()
+
+        let closeMaximum = CIFilter.morphologyMaximum()
+        closeMaximum.inputImage = clamped
+        closeMaximum.radius = 0.55
+
+        let closeMinimum = CIFilter.morphologyMinimum()
+        closeMinimum.inputImage = closeMaximum.outputImage ?? clamped
+        closeMinimum.radius = 0.50
+
+        let closed = (closeMinimum.outputImage ?? closeMaximum.outputImage ?? clamped).cropped(to: extent)
+
+        let solidCore = CIFilter.morphologyMinimum()
+        solidCore.inputImage = closed.clampedToExtent()
+        solidCore.radius = 0.22
 
         let blur = CIFilter.gaussianBlur()
-        blur.inputImage = maximum.outputImage ?? clamped
-        blur.radius = 1.1
+        blur.inputImage = closed.clampedToExtent()
+        blur.radius = 0.72
+
+        let gamma = CIFilter.gammaAdjust()
+        gamma.inputImage = blur.outputImage?.cropped(to: extent) ?? closed
+        gamma.power = 0.86
 
         let controls = CIFilter.colorControls()
-        controls.inputImage = blur.outputImage?.cropped(to: extent) ?? mask
-        controls.contrast = 1.18
-        controls.brightness = 0.015
+        controls.inputImage = gamma.outputImage?.cropped(to: extent) ?? blur.outputImage?.cropped(to: extent) ?? closed
+        controls.contrast = 1.22
+        controls.brightness = -0.015
 
-        return (controls.outputImage ?? mask).cropped(to: extent)
+        let featheredEdge = (controls.outputImage ?? closed).cropped(to: extent)
+        let core = (solidCore.outputImage ?? closed).cropped(to: extent)
+
+        if let maximum = CIFilter(name: "CIMaximumCompositing") {
+            maximum.setValue(core, forKey: kCIInputImageKey)
+            maximum.setValue(featheredEdge, forKey: kCIInputBackgroundImageKey)
+            return (maximum.outputImage ?? featheredEdge).cropped(to: extent)
+        }
+
+        return featheredEdge.cropped(to: extent)
     }
 }
 

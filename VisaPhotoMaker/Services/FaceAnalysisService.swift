@@ -22,14 +22,46 @@ struct FaceAnalysisService {
             let faceAnalysis = face.map { observation in
                 let rect = observation.boundingBox
                 let landmarks = observation.landmarks
-                let leftEye = landmarks?.leftEye?.normalizedPoints.first
-                let rightEye = landmarks?.rightEye?.normalizedPoints.first
+                let leftEye = Self.featureCenter(landmarks?.leftEye?.normalizedPoints)
+                let rightEye = Self.featureCenter(landmarks?.rightEye?.normalizedPoints)
+                let noseCenter = Self.featureCenter(landmarks?.nose?.normalizedPoints)
+                    ?? Self.featureCenter(landmarks?.noseCrest?.normalizedPoints)
+                let mouthCenter = Self.featureCenter(landmarks?.outerLips?.normalizedPoints)
+                    ?? Self.featureCenter(landmarks?.innerLips?.normalizedPoints)
                 let eyeHeightRatio = Self.eyeHeight(leftEye: leftEye, rightEye: rightEye, in: rect)
-                let rollDegrees = Self.rollDegrees(observationRoll: observation.roll?.doubleValue, leftEye: leftEye, rightEye: rightEye, in: rect)
-                let visualMetrics = Self.visualHeadMetrics(for: cgImage, faceRect: rect)
+                let eyeCenterXRatio = Self.eyeCenterX(leftEye: leftEye, rightEye: rightEye, in: rect)
+                let noseCenterXRatio = Self.featureX(noseCenter, in: rect)
+                let eyeLineRollDegrees = Self.eyeLineRollDegrees(leftEye: leftEye, rightEye: rightEye, in: rect)
+                let rollDegrees = Self.rollDegrees(
+                    observationRoll: observation.roll?.doubleValue,
+                    eyeLineRollDegrees: eyeLineRollDegrees
+                )
+                let visualMetrics = Self.visualHeadMetrics(
+                    for: cgImage,
+                    faceRect: rect,
+                    faceContour: landmarks?.faceContour?.normalizedPoints,
+                    leftEye: leftEye,
+                    rightEye: rightEye,
+                    mouthCenter: mouthCenter
+                )
                 let topMarginRatio = visualMetrics?.topMarginRatio ?? (1 - rect.maxY)
                 let bottomMarginRatio = visualMetrics?.bottomMarginRatio ?? rect.minY
                 let visualCenterOffset = visualMetrics?.signedCenterOffsetRatio
+                let eyesOpenScore = Self.eyesOpenScore(
+                    leftEye: landmarks?.leftEye?.normalizedPoints,
+                    rightEye: landmarks?.rightEye?.normalizedPoints
+                )
+                let glassesSignals = Self.glassesSignals(
+                    for: cgImage,
+                    faceRect: rect,
+                    leftEye: leftEye,
+                    rightEye: rightEye
+                )
+                let headCoveringRisk = Self.hasHeadCoveringRisk(
+                    for: cgImage,
+                    faceRect: rect,
+                    hairTopRatio: visualMetrics?.topMarginRatio
+                )
 
                 return FaceAnalysis(
                     faceRect: rect,
@@ -37,8 +69,11 @@ struct FaceAnalysisService {
                     centerOffsetRatio: abs(visualCenterOffset ?? Double(rect.midX - 0.5)),
                     signedCenterOffsetRatio: Double(rect.midX - 0.5),
                     rollDegrees: rollDegrees,
+                    eyeLineRollDegrees: eyeLineRollDegrees,
                     quality: min(1, max(0, Double(rect.width * rect.height) * 4)),
                     eyeHeightRatio: eyeHeightRatio,
+                    eyeCenterXRatio: eyeCenterXRatio,
+                    noseCenterXRatio: noseCenterXRatio,
                     topMarginRatio: Double(topMarginRatio),
                     bottomMarginRatio: Double(bottomMarginRatio),
                     visualTopMarginRatio: visualMetrics?.topMarginRatio,
@@ -47,6 +82,10 @@ struct FaceAnalysisService {
                     visualSignedCenterOffsetRatio: visualCenterOffset,
                     visualHeadRect: visualMetrics?.headRect,
                     hasBothEyes: landmarks?.leftEye != nil && landmarks?.rightEye != nil,
+                    eyesOpenScore: eyesOpenScore,
+                    hasGlassesRisk: glassesSignals.hasGlassesRisk,
+                    hasGlareRisk: glassesSignals.hasGlareRisk,
+                    hasHeadCoveringRisk: headCoveringRisk,
                     hasMouth: landmarks?.outerLips != nil || landmarks?.innerLips != nil
                 )
             }
@@ -61,23 +100,77 @@ struct FaceAnalysisService {
         return Double(faceRect.minY + localY * faceRect.height)
     }
 
-    private static func rollDegrees(observationRoll: Double?, leftEye: CGPoint?, rightEye: CGPoint?, in faceRect: CGRect) -> Double {
-        let visionDegrees = (observationRoll ?? 0) * 180 / .pi
-        guard let leftEye, let rightEye else {
-            return visionDegrees
-        }
-
-        let dx = Double((rightEye.x - leftEye.x) * faceRect.width)
-        let dy = Double((rightEye.y - leftEye.y) * faceRect.height)
-        guard abs(dx) > 0.0001 else { return visionDegrees }
-
-        let eyeLineDegrees = atan2(dy, dx) * 180 / .pi
-        return abs(eyeLineDegrees) >= abs(visionDegrees) ? eyeLineDegrees : visionDegrees
+    private static func eyeCenterX(leftEye: CGPoint?, rightEye: CGPoint?, in faceRect: CGRect) -> Double? {
+        guard let leftEye, let rightEye else { return nil }
+        let localX = (leftEye.x + rightEye.x) / 2
+        return Double(faceRect.minX + localX * faceRect.width)
     }
 
-    private static func visualHeadMetrics(for image: CGImage, faceRect: CGRect) -> (topMarginRatio: Double, bottomMarginRatio: Double, headHeightRatio: Double, signedCenterOffsetRatio: Double, headRect: CGRect)? {
-        let width = 96
-        let height = 96
+    private static func featureX(_ point: CGPoint?, in faceRect: CGRect) -> Double? {
+        guard let point else { return nil }
+        return Double(faceRect.minX + point.x * faceRect.width)
+    }
+
+    private static func featureCenter(_ points: [CGPoint]?) -> CGPoint? {
+        guard let points, !points.isEmpty else { return nil }
+        let sum = points.reduce(CGPoint.zero) { partial, point in
+            CGPoint(x: partial.x + point.x, y: partial.y + point.y)
+        }
+        let count = CGFloat(points.count)
+        return CGPoint(x: sum.x / count, y: sum.y / count)
+    }
+
+    private static func eyesOpenScore(leftEye: [CGPoint]?, rightEye: [CGPoint]?) -> Double? {
+        let left = eyeOpenRatio(points: leftEye)
+        let right = eyeOpenRatio(points: rightEye)
+        switch (left, right) {
+        case let (l?, r?):
+            return (l + r) / 2
+        case let (l?, nil):
+            return l
+        case let (nil, r?):
+            return r
+        default:
+            return nil
+        }
+    }
+
+    private static func eyeOpenRatio(points: [CGPoint]?) -> Double? {
+        guard let points, points.count >= 4 else { return nil }
+        let xs = points.map(\.x)
+        let ys = points.map(\.y)
+        let width = (xs.max() ?? 0) - (xs.min() ?? 0)
+        let height = (ys.max() ?? 0) - (ys.min() ?? 0)
+        guard width > 0.0001 else { return nil }
+        return Double(height / width)
+    }
+
+    private static func eyeLineRollDegrees(leftEye: CGPoint?, rightEye: CGPoint?, in faceRect: CGRect) -> Double? {
+        guard let leftEye, let rightEye else { return nil }
+        let dx = Double((rightEye.x - leftEye.x) * faceRect.width)
+        let dy = Double((rightEye.y - leftEye.y) * faceRect.height)
+        guard abs(dx) > 0.0001 else { return nil }
+        return atan2(dy, dx) * 180 / .pi
+    }
+
+    private static func rollDegrees(observationRoll: Double?, eyeLineRollDegrees: Double?) -> Double {
+        let visionDegrees = (observationRoll ?? 0) * 180 / .pi
+        guard let eyeLineRollDegrees else {
+            return visionDegrees
+        }
+        return abs(eyeLineRollDegrees) >= abs(visionDegrees) ? eyeLineRollDegrees : visionDegrees
+    }
+
+    private static func visualHeadMetrics(
+        for image: CGImage,
+        faceRect: CGRect,
+        faceContour: [CGPoint]?,
+        leftEye: CGPoint?,
+        rightEye: CGPoint?,
+        mouthCenter: CGPoint?
+    ) -> (topMarginRatio: Double, bottomMarginRatio: Double, headHeightRatio: Double, signedCenterOffsetRatio: Double, headRect: CGRect)? {
+        let width = 160
+        let height = 160
         let bytesPerPixel = 4
         let bytesPerRow = width * bytesPerPixel
         var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
@@ -116,8 +209,6 @@ struct FaceAnalysisService {
         var bottomY: Int?
         var minSubjectX = maxX
         var maxSubjectX = minX
-        var fullMinSubjectX = maxX
-        var fullMaxSubjectX = minX
         var subjectRows = 0
         for y in minYFromTop...maxYFromTop {
             let normalizedY = Double(y - minYFromTop) / Double(max(maxYFromTop - minYFromTop, 1))
@@ -137,10 +228,6 @@ struct FaceAnalysisService {
             }
             if Double(hits) / Double(maxX - minX + 1) > 0.08 {
                 bottomY = y
-                if let rowMinX, let rowMaxX {
-                    fullMinSubjectX = min(fullMinSubjectX, rowMinX)
-                    fullMaxSubjectX = max(fullMaxSubjectX, rowMaxX)
-                }
             }
             if normalizedY <= 0.74, Double(hits) / Double(maxX - minX + 1) > 0.10, let rowMinX, let rowMaxX {
                 minSubjectX = min(minSubjectX, rowMinX)
@@ -150,26 +237,222 @@ struct FaceAnalysisService {
         }
         guard let topY else { return nil }
 
-        let chinYFromTop = Int((1 - faceRect.minY) * Double(height))
-        let estimatedChinY = min(maxYFromTop, max(bottomY ?? chinYFromTop, chinYFromTop, topY + 1))
+        let faceContourChinYFromTop = faceContourChinYFromTop(
+            faceContour: faceContour,
+            faceRect: faceRect,
+            imageHeight: height
+        )
+        let geometricChinYFromTop = geometricChinYFromTop(
+            faceRect: faceRect,
+            leftEye: leftEye,
+            rightEye: rightEye,
+            mouthCenter: mouthCenter,
+            imageHeight: height
+        )
+        let visionChinYFromTop = Int((1 - faceRect.minY) * Double(height))
+        let faceHeightPixels = max(Int(faceRect.height * Double(height)), 1)
+        let fallbackChinPadding = max(Int(Double(faceHeightPixels) * 0.075), 2)
+        let minimumChinY = max(visionChinYFromTop - max(Int(Double(faceHeightPixels) * 0.025), 1), topY + 1)
+        let subjectChinY = bottomY.map {
+            min($0, visionChinYFromTop + max(Int(Double(faceHeightPixels) * 0.12), 3))
+        }
+        let contourChinIsUsable = faceContourChinYFromTop.map {
+            $0 >= visionChinYFromTop - Int(Double(faceHeightPixels) * 0.08)
+        } ?? false
+        let estimatedChinY = min(
+            maxYFromTop,
+            max(
+                geometricChinYFromTop ?? 0,
+                contourChinIsUsable ? (faceContourChinYFromTop ?? 0) : 0,
+                subjectChinY ?? 0,
+                visionChinYFromTop + fallbackChinPadding,
+                minimumChinY
+            )
+        )
         let topMarginRatio = Double(topY) / Double(height)
         let bottomMarginRatio = Double(height - estimatedChinY) / Double(height)
         let headHeightRatio = Double(estimatedChinY - topY) / Double(height)
-        let visualMidX: Double
-        if subjectRows >= 3, minSubjectX < maxSubjectX {
-            visualMidX = (Double(minSubjectX) + Double(maxSubjectX)) / 2 / Double(width)
-        } else {
-            visualMidX = Double(faceRect.midX)
-        }
-        let headMinX = fullMinSubjectX < fullMaxSubjectX ? fullMinSubjectX : minSubjectX
-        let headMaxX = fullMinSubjectX < fullMaxSubjectX ? fullMaxSubjectX : maxSubjectX
+        let robustHeadBounds = robustSubjectBounds(
+            topY: topY,
+            estimatedChinY: estimatedChinY,
+            minX: minX,
+            maxX: maxX,
+            imageWidth: width,
+            faceRect: faceRect,
+            background: background,
+            pixels: pixels,
+            bytesPerPixel: bytesPerPixel,
+            bytesPerRow: bytesPerRow
+        )
+        let rawHeadMinX = robustHeadBounds?.minX ?? (subjectRows >= 3 ? minSubjectX : Int(faceRect.minX * Double(width)))
+        let rawHeadMaxX = robustHeadBounds?.maxX ?? (subjectRows >= 3 ? maxSubjectX : Int(faceRect.maxX * Double(width)))
+        let rawHeadMidX = (Double(rawHeadMinX) + Double(rawHeadMaxX)) / 2 / Double(width)
+        let faceMidX = Double(faceRect.midX)
+        let visualMidX = abs(rawHeadMidX - faceMidX) > 0.08
+            ? faceMidX
+            : faceMidX * 0.62 + rawHeadMidX * 0.38
+        let rawHeadWidthRatio = Double(max(rawHeadMaxX - rawHeadMinX, 1)) / Double(width)
+        let minHeadWidthRatio = Double(faceRect.width) * 1.04
+        let maxHeadWidthRatio = min(headHeightRatio * 0.76, Double(faceRect.width) * 1.58)
+        let headWidthRatio = clamp(rawHeadWidthRatio, min: minHeadWidthRatio, max: max(maxHeadWidthRatio, minHeadWidthRatio))
+        let headMinXRatio = clamp(visualMidX - headWidthRatio / 2, min: 0, max: 1 - headWidthRatio)
         let headRect = CGRect(
-            x: Double(headMinX) / Double(width),
+            x: headMinXRatio,
             y: 1 - Double(estimatedChinY) / Double(height),
-            width: Double(max(headMaxX - headMinX, 1)) / Double(width),
+            width: headWidthRatio,
             height: Double(estimatedChinY - topY) / Double(height)
         )
         return (topMarginRatio, bottomMarginRatio, headHeightRatio, visualMidX - 0.5, headRect)
+    }
+
+    private static func faceContourChinYFromTop(faceContour: [CGPoint]?, faceRect: CGRect, imageHeight: Int) -> Int? {
+        guard let faceContour, !faceContour.isEmpty else { return nil }
+        let localYs = faceContour.map(\.y)
+        guard let minLocalY = localYs.min(), let maxLocalY = localYs.max() else { return nil }
+
+        let candidates = [
+            faceRect.minY + minLocalY * faceRect.height,
+            faceRect.minY + maxLocalY * faceRect.height,
+            faceRect.minY + (1 - minLocalY) * faceRect.height,
+            faceRect.minY + (1 - maxLocalY) * faceRect.height
+        ]
+        .map { Int((1 - $0) * Double(imageHeight)) }
+
+        return candidates.max()
+    }
+
+    private static func geometricChinYFromTop(
+        faceRect: CGRect,
+        leftEye: CGPoint?,
+        rightEye: CGPoint?,
+        mouthCenter: CGPoint?,
+        imageHeight: Int
+    ) -> Int? {
+        guard let mouthCenter else { return nil }
+        let eyeCenter = switch (leftEye, rightEye) {
+        case let (left?, right?):
+            CGPoint(x: (left.x + right.x) / 2, y: (left.y + right.y) / 2)
+        case let (left?, nil):
+            left
+        case let (nil, right?):
+            right
+        default:
+            CGPoint(x: 0.5, y: 0.68)
+        }
+
+        let eyeYFromTop = yFromTop(point: eyeCenter, faceRect: faceRect, imageHeight: imageHeight)
+        let mouthYFromTop = yFromTop(point: mouthCenter, faceRect: faceRect, imageHeight: imageHeight)
+        let eyeToMouth = mouthYFromTop - eyeYFromTop
+        guard eyeToMouth > Double(imageHeight) * 0.025 else { return nil }
+
+        let estimated = mouthYFromTop + eyeToMouth * 0.72
+        return Int(estimated.rounded())
+    }
+
+    private static func yFromTop(point: CGPoint, faceRect: CGRect, imageHeight: Int) -> Double {
+        let normalizedY = faceRect.minY + point.y * faceRect.height
+        return (1 - normalizedY) * Double(imageHeight)
+    }
+
+    private static func robustSubjectBounds(
+        topY: Int,
+        estimatedChinY: Int,
+        minX: Int,
+        maxX: Int,
+        imageWidth: Int,
+        faceRect: CGRect,
+        background: (Double, Double, Double),
+        pixels: [UInt8],
+        bytesPerPixel: Int,
+        bytesPerRow: Int
+    ) -> (minX: Int, maxX: Int)? {
+        let faceWidthPixels = max(Int(faceRect.width * Double(imageWidth)), 1)
+        let maxReasonableWidth = max(Int(Double(faceWidthPixels) * 1.95), faceWidthPixels + 4)
+        var rowBounds: [(minX: Int, maxX: Int, width: Int)] = []
+
+        for y in topY...estimatedChinY {
+            var hits = 0
+            var rowMinX: Int?
+            var rowMaxX: Int?
+            for x in minX...maxX {
+                let color = rgb(atX: x, y: y, pixels: pixels, bytesPerPixel: bytesPerPixel, bytesPerRow: bytesPerRow)
+                if colorDistance(color, background) > 0.20 && luminance(color) < 0.92 {
+                    hits += 1
+                    rowMinX = min(rowMinX ?? x, x)
+                    rowMaxX = max(rowMaxX ?? x, x)
+                }
+            }
+
+            guard
+                let rowMinX,
+                let rowMaxX,
+                Double(hits) / Double(maxX - minX + 1) > 0.08
+            else { continue }
+
+            let rowWidth = rowMaxX - rowMinX
+            guard rowWidth <= maxReasonableWidth else { continue }
+            rowBounds.append((rowMinX, rowMaxX, rowWidth))
+        }
+
+        guard rowBounds.count >= 3 else { return nil }
+        rowBounds.sort { $0.width < $1.width }
+        let trimmed = rowBounds.dropFirst(rowBounds.count / 5).dropLast(rowBounds.count / 5)
+        let candidates = trimmed.isEmpty ? rowBounds[...] : trimmed[...]
+        let minSubjectX = candidates.map(\.minX).min() ?? minX
+        let maxSubjectX = candidates.map(\.maxX).max() ?? maxX
+        return minSubjectX < maxSubjectX ? (minSubjectX, maxSubjectX) : nil
+    }
+
+    private static func clamp(_ value: Double, min minValue: Double, max maxValue: Double) -> Double {
+        Swift.min(Swift.max(value, minValue), maxValue)
+    }
+
+    private static func hasHeadCoveringRisk(for image: CGImage, faceRect: CGRect, hairTopRatio: Double?) -> Bool {
+        let width = 96
+        let height = 96
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        context?.interpolationQuality = .low
+        context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        let sampleTop = max(Int((1 - faceRect.maxY - faceRect.height * 0.30) * Double(height)), 0)
+        let sampleBottom = min(Int((1 - faceRect.maxY + faceRect.height * 0.10) * Double(height)), height - 1)
+        let sampleLeft = max(Int((faceRect.minX + faceRect.width * 0.12) * Double(width)), 0)
+        let sampleRight = min(Int((faceRect.maxX - faceRect.width * 0.12) * Double(width)), width - 1)
+        guard sampleTop < sampleBottom, sampleLeft < sampleRight else { return false }
+
+        var darkHits = 0
+        var opaqueHits = 0
+        let total = max((sampleBottom - sampleTop + 1) * (sampleRight - sampleLeft + 1), 1)
+
+        for y in sampleTop...sampleBottom {
+            for x in sampleLeft...sampleRight {
+                let rgb = rgb(atX: x, y: y, pixels: pixels, bytesPerPixel: bytesPerPixel, bytesPerRow: bytesPerRow)
+                let lum = luminance(rgb)
+                if lum < 0.22 {
+                    darkHits += 1
+                }
+                if colorDistance(rgb, (1, 1, 1)) > 0.18 {
+                    opaqueHits += 1
+                }
+            }
+        }
+
+        let darkRatio = Double(darkHits) / Double(total)
+        let opaqueRatio = Double(opaqueHits) / Double(total)
+        let tooFlatTop = (hairTopRatio ?? 0.08) < 0.028
+        return tooFlatTop && darkRatio > 0.48 && opaqueRatio > 0.78
     }
 
     private static func rgb(atX x: Int, y: Int, pixels: [UInt8], bytesPerPixel: Int, bytesPerRow: Int) -> (Double, Double, Double) {
@@ -306,5 +589,86 @@ struct FaceAnalysisService {
             fallback.append(luminance[y * width + width - 1])
         }
         return fallback
+    }
+
+    private static func glassesSignals(
+        for image: CGImage,
+        faceRect: CGRect,
+        leftEye: CGPoint?,
+        rightEye: CGPoint?
+    ) -> (hasGlassesRisk: Bool, hasGlareRisk: Bool) {
+        guard let leftEye, let rightEye else { return (false, false) }
+
+        let width = 120
+        let height = 120
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        context?.interpolationQuality = .low
+        context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        let eyeCenters = [leftEye, rightEye].map { eye -> CGPoint in
+            CGPoint(
+                x: (faceRect.minX + eye.x * faceRect.width) * Double(width),
+                y: (1 - (faceRect.minY + eye.y * faceRect.height)) * Double(height)
+            )
+        }
+
+        var glareHits = 0
+        var totalSamples = 0
+        var horizontalFrameLineScore = 0
+        var verticalFrameLineScore = 0
+
+        for center in eyeCenters {
+            let minX = max(Int(center.x) - 12, 1)
+            let maxX = min(Int(center.x) + 12, width - 2)
+            let minY = max(Int(center.y) - 7, 1)
+            let maxY = min(Int(center.y) + 7, height - 2)
+
+            for y in minY...maxY {
+                var rowDarkEdgeHits = 0
+                for x in minX...maxX {
+                    totalSamples += 1
+                    let current = rgb(atX: x, y: y, pixels: pixels, bytesPerPixel: bytesPerPixel, bytesPerRow: bytesPerRow)
+                    let lum = luminance(current)
+                    let left = rgb(atX: x - 1, y: y, pixels: pixels, bytesPerPixel: bytesPerPixel, bytesPerRow: bytesPerRow)
+                    let right = rgb(atX: x + 1, y: y, pixels: pixels, bytesPerPixel: bytesPerPixel, bytesPerRow: bytesPerRow)
+                    let up = rgb(atX: x, y: y - 1, pixels: pixels, bytesPerPixel: bytesPerPixel, bytesPerRow: bytesPerRow)
+                    let down = rgb(atX: x, y: y + 1, pixels: pixels, bytesPerPixel: bytesPerPixel, bytesPerRow: bytesPerRow)
+                    let horizontalEdge = abs(luminance(left) - lum) + abs(luminance(right) - lum)
+                    let verticalEdge = abs(luminance(up) - lum) + abs(luminance(down) - lum)
+                    let isNearPupil = abs(Double(x) - Double(center.x)) < 5 && abs(Double(y) - Double(center.y)) < 4
+
+                    if !isNearPupil, lum < 0.24, horizontalEdge > 0.42 {
+                        rowDarkEdgeHits += 1
+                    }
+                    if !isNearPupil, lum < 0.24, verticalEdge > 0.42 {
+                        verticalFrameLineScore += 1
+                    }
+                    if lum > 0.96 && colorDistance(current, (1, 1, 1)) < 0.08 {
+                        glareHits += 1
+                    }
+                }
+                if rowDarkEdgeHits >= 9 {
+                    horizontalFrameLineScore += 1
+                }
+            }
+        }
+
+        guard totalSamples > 0 else { return (false, false) }
+        let glareRatio = Double(glareHits) / Double(totalSamples)
+        let hasStrongGlare = glareRatio > 0.10
+        let hasLikelyFrame = horizontalFrameLineScore >= 6 && verticalFrameLineScore >= 26
+        return (hasLikelyFrame, hasStrongGlare)
     }
 }

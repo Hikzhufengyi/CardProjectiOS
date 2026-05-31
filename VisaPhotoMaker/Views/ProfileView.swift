@@ -6,6 +6,7 @@ struct ProfileView: View {
     @StateObject private var profile = LocalProfileStore.shared
     @StateObject private var store = StoreService.shared
     @State private var showingPrivacy = false
+    @State private var showingPaywall = false
 
     var body: some View {
         NavigationStack {
@@ -22,6 +23,11 @@ struct ProfileView: View {
             .sheet(isPresented: $showingPrivacy) {
                 PrivacyDisclaimerView()
             }
+            .sheet(isPresented: $showingPaywall) {
+                PaywallView(store: store) {
+                    showingPaywall = false
+                }
+            }
             .task {
                 await store.loadProducts()
             }
@@ -32,6 +38,17 @@ struct ProfileView: View {
     private var proSection: some View {
         Section {
             MembershipIdentityCard(hasProAccess: store.hasProAccess)
+
+            if !store.hasProAccess {
+                Button {
+                    showingPaywall = true
+                } label: {
+                    Label(L10n.text(en: "Unlock Lifetime", zh: "解锁终身版"), systemImage: "lock.open.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppTheme.officialBlue)
+                .disabled(store.isLoadingProducts || store.isPurchasing)
+            }
 
             Button {
                 Task { await store.restore() }
@@ -110,7 +127,8 @@ struct ProfileView: View {
 
     private var appVersionText: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        return "v\(version)"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        return build.isEmpty ? "v\(version)" : "v\(version) (\(build))"
     }
 
     private var recordsSection: some View {

@@ -26,6 +26,7 @@ struct ExportView: View {
     @State private var saveMessage: String?
     @State private var exportAlert: ExportAlert?
     @State private var didAddCreationRecord = false
+    @State private var isSavingToPhotos = false
     @StateObject private var profile = LocalProfileStore.shared
 
     private let renderer = PhotoRenderer()
@@ -84,7 +85,16 @@ struct ExportView: View {
                     Button {
                         save(selectedOutputImage)
                     } label: {
-                        Label(primarySaveTitle, systemImage: "square.and.arrow.down")
+                        HStack(spacing: 9) {
+                            if isSavingToPhotos {
+                                ProgressView()
+                                    .tint(.white)
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "square.and.arrow.down")
+                            }
+                            Text(isSavingToPhotos ? L10n.text(en: "Saving to Photos...", zh: "正在保存到相册...") : primarySaveTitle)
+                        }
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)
@@ -92,7 +102,8 @@ struct ExportView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.white)
                     .background(AppTheme.officialBlue, in: RoundedRectangle(cornerRadius: 11))
-                    .disabled(selectedOutputImage == nil)
+                    .disabled(selectedOutputImage == nil || isSavingToPhotos)
+                    .opacity(isSavingToPhotos ? 0.76 : 1)
 
                     HStack(spacing: 10) {
                         Button {
@@ -105,7 +116,7 @@ struct ExportView: View {
                         .buttonStyle(.plain)
                         .foregroundStyle(AppTheme.officialBlue)
                         .background(AppTheme.groupedBackground, in: RoundedRectangle(cornerRadius: 10))
-                        .disabled(exportData == nil)
+                        .disabled(exportData == nil || isSavingToPhotos)
 
                         Button {
                             exportToFiles()
@@ -117,7 +128,7 @@ struct ExportView: View {
                         .buttonStyle(.plain)
                         .foregroundStyle(AppTheme.officialBlue)
                         .background(AppTheme.groupedBackground, in: RoundedRectangle(cornerRadius: 10))
-                        .disabled(exportData == nil)
+                        .disabled(exportData == nil || isSavingToPhotos)
                     }
                 }
                 .padding(.horizontal, 14)
@@ -656,10 +667,14 @@ struct ExportView: View {
 
     private func save(_ image: UIImage?) {
         guard let image else { return }
+        guard !isSavingToPhotos else { return }
+        isSavingToPhotos = true
+        saveMessage = L10n.text(en: "Saving to Photos...", zh: "正在保存到相册...")
         if exportData == nil {
             exportData = renderer.exportData(image: image, format: exportFormat, targetKB: targetKB)
         }
         saver.save(image) { result in
+            isSavingToPhotos = false
             switch result {
             case .success:
                 saveMessage = L10n.text(en: "Saved to Photos.", zh: "已保存到相册。")

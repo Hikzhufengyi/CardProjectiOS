@@ -1,6 +1,11 @@
 import UIKit
 
 struct ComplianceService {
+    private enum VerticalGuidanceDirection {
+        case up
+        case down
+    }
+
     func evaluate(image: UIImage?, spec: PhotoSpec, selectedBackground: PhotoBackground, analysis: PhotoAnalysis?) -> ComplianceResult {
         var checks: [ComplianceCheck] = []
 
@@ -15,20 +20,6 @@ struct ComplianceService {
                 )
             ])
         }
-
-        let ratio = image.size.width / max(image.size.height, 1)
-        let targetRatio = spec.pixelSize.width / spec.pixelSize.height
-        let ratioDelta = abs(ratio - targetRatio)
-
-        checks.append(ComplianceCheck(
-            title: L10n.text(en: "Format", zh: "画幅比例"),
-            message: ratioDelta < 0.08
-                ? (L10n.text(en: "The photo can be cropped to \(spec.displayPixels).", zh: "照片可以裁切为 \(spec.displayPixels)。"))
-                : (L10n.text(en: "Crop is needed to match \(spec.displaySize).", zh: "需要调整裁剪以匹配 \(spec.displaySize)。")),
-            severity: ratioDelta < 0.08 ? .pass : .warning,
-            action: ratioDelta < 0.08 ? nil : (L10n.text(en: "Use zoom, rotate, and move controls until the face sits inside the guide.", zh: "使用缩放、旋转和移动控制让脸部位于参考框内。")),
-            kind: .format
-        ))
 
         let shortestSide = min(image.size.width, image.size.height)
         checks.append(ComplianceCheck(
@@ -62,9 +53,17 @@ struct ComplianceService {
         }
 
         if let faceAnalysis = analysis?.face {
+            let profile = spec.complianceProfile
             let headRatio = faceAnalysis.effectiveHeadHeightRatio
-            let minimumTopMargin = strictTopMarginRatio(for: spec)
+            let minimumTopMargin = profile.minimumTopMarginRatio
+            let minimumBottomMargin = profile.minimumBottomMarginRatio
             let headTilt = abs(faceAnalysis.rollDegrees)
+            let verticalGuideDirection = resolvedVerticalGuidanceDirection(
+                faceAnalysis: faceAnalysis,
+                profile: profile,
+                minimumTopMargin: minimumTopMargin,
+                minimumBottomMargin: minimumBottomMargin
+            )
             let headTiltSeverity: ComplianceSeverity = if headTilt <= 3.5 {
                 .pass
             } else if headTilt <= 9 {
@@ -72,13 +71,12 @@ struct ComplianceService {
             } else {
                 .fail
             }
-            let targetHeadRatio = (spec.minHeadRatio + spec.maxHeadRatio) / 2
-            let strictHeadTolerance = max((spec.maxHeadRatio - spec.minHeadRatio) * 0.32, 0.025)
-            let warningHeadTolerance = max((spec.maxHeadRatio - spec.minHeadRatio) * 0.50, 0.045)
-            let headDelta = abs(headRatio - targetHeadRatio)
-            let headSeverity: ComplianceSeverity = if headDelta <= strictHeadTolerance {
+            let headDelta = abs(headRatio - profile.targetHeadRatio)
+            let requiresStrictHeadFraming = profile.framingWeights.headSize >= 1.20 || spec.heightMM / max(spec.widthMM, 1) >= 1.32
+            let isInsideOfficialHeadRange = headRatio >= spec.minHeadRatio && headRatio <= spec.maxHeadRatio
+            let headSeverity: ComplianceSeverity = if isInsideOfficialHeadRange {
                 .pass
-            } else if headDelta <= warningHeadTolerance || (headRatio >= spec.minHeadRatio && headRatio <= spec.maxHeadRatio) {
+            } else if !requiresStrictHeadFraming && headDelta <= profile.headWarningTolerance {
                 .warning
             } else {
                 .fail
@@ -94,9 +92,11 @@ struct ComplianceService {
             ))
 
             let centerOffset = faceAnalysis.effectiveCenterOffsetRatio
-            let centerSeverity: ComplianceSeverity = if faceAnalysis.isCentered {
+            let centerlineGap = faceAnalysis.eyeNoseCenterlineGapRatio ?? 0
+            let centerlineIsStable = centerlineGap <= 0.045
+            let centerSeverity: ComplianceSeverity = if faceAnalysis.isCentered && centerlineIsStable {
                 .pass
-            } else if centerOffset <= FaceAnalysis.centerWarningThreshold && faceAnalysis.visualAndFaceCentersAgree {
+            } else if centerOffset <= FaceAnalysis.centerWarningThreshold && centerlineGap <= 0.070 {
                 .warning
             } else {
                 .fail
@@ -104,11 +104,20 @@ struct ComplianceService {
             let centerDirection = faceAnalysis.effectiveSignedCenterOffsetRatio < 0
                 ? L10n.text(en: "left", zh: "左侧")
                 : L10n.text(en: "right", zh: "右侧")
+            let centerMessage: String = if centerSeverity == .pass {
+                L10n.text(en: "Face centerline is aligned in the frame.", zh: "双眼中心和鼻梁中心线位于画面中央。")
+            } else if !centerlineIsStable {
+                L10n.isChinese
+                    ? "双眼中心和鼻梁中心线相差约 \(Int((centerlineGap * 100).rounded()))%，请保持正脸并让中心线进入中间范围。"
+                    : "Eye center and nose center differ by about \(Int((centerlineGap * 100).rounded()))%; face forward and keep the centerline in the middle range."
+            } else {
+                L10n.isChinese
+                    ? "面部中心线偏向\(centerDirection)，偏移约 \(Int((centerOffset * 100).rounded()))%，需要进入中间范围。"
+                    : "Face centerline is shifted to the \(centerDirection) by about \(Int((centerOffset * 100).rounded()))%; keep it in the middle range."
+            }
             checks.append(ComplianceCheck(
                 title: L10n.text(en: "Face centered", zh: "面部居中"),
-                message: centerSeverity == .pass
-                    ? (L10n.text(en: "Face is centered in the frame.", zh: "面部位于画面中央。"))
-                    : (L10n.isChinese ? "头像或面部偏向\(centerDirection)，偏移约 \(Int((centerOffset * 100).rounded()))%，需要进入虚线框中心区域。" : "Head or face is shifted to the \(centerDirection) by about \(Int((centerOffset * 100).rounded()))%; keep it inside the center guide."),
+                message: centerMessage,
                 severity: centerSeverity,
                 action: centerSeverity == .pass ? nil : (faceAnalysis.effectiveSignedCenterOffsetRatio < 0
                     ? L10n.text(en: "Move the photo to the right or use smart fix to center the face.", zh: "请把照片向右移动，或使用智能修复让面部居中。")
@@ -134,70 +143,147 @@ struct ComplianceService {
                 kind: .eyesVisible
             ))
 
-            if let eyeHeight = faceAnalysis.eyeHeightRatio {
-                let eyeHeightSeverity: ComplianceSeverity = if eyeHeight >= 0.535 && eyeHeight <= 0.585 {
+            let glassesCheck = makeGlassesCheck(policy: profile.glassesPolicy, faceAnalysis: faceAnalysis)
+            if let glassesCheck {
+                checks.append(glassesCheck)
+            }
+
+            if let eyesOpenScore = faceAnalysis.eyesOpenScore {
+                let severity: ComplianceSeverity = if eyesOpenScore >= 0.18 {
                     .pass
-                } else if eyeHeight >= 0.50 && eyeHeight <= 0.62 {
+                } else if eyesOpenScore >= 0.12 {
                     .warning
                 } else {
                     .fail
                 }
+                checks.append(ComplianceCheck(
+                    title: L10n.text(en: "Eyes open", zh: "双眼睁开"),
+                    message: severity == .pass
+                        ? L10n.text(en: "Eyes appear open enough for a passport photo.", zh: "双眼睁开程度基本符合证件照要求。")
+                        : L10n.text(en: "Eyes may look partially closed or squinting.", zh: "双眼可能偏眯，或有闭眼风险。"),
+                    severity: severity,
+                    action: severity == .pass ? nil : L10n.text(en: "Retake with both eyes fully open and looking straight at the camera.", zh: "请双眼自然睁开，正视镜头后重拍。"),
+                    kind: .eyesOpen
+                ))
+            }
+
+            checks.append(ComplianceCheck(
+                title: L10n.text(en: "Head covering", zh: "头顶遮挡"),
+                message: faceAnalysis.hasHeadCoveringRisk
+                    ? L10n.text(en: "The top of the head may be covered by a hat, hood, or headscarf.", zh: "头顶可能存在帽子、头巾或其他遮挡。")
+                    : L10n.text(en: "No obvious head covering detected.", zh: "未检测到明显头顶遮挡。"),
+                severity: faceAnalysis.hasHeadCoveringRisk ? .warning : .pass,
+                action: faceAnalysis.hasHeadCoveringRisk ? L10n.text(en: "Remove hats, headscarves, or anything covering the top of the head unless officially required.", zh: "如非官方必须，请去掉帽子、头巾或头顶遮挡物。") : nil,
+                kind: .headCover
+            ))
+
+            if let eyeHeight = faceAnalysis.eyeHeightRatio {
+                let eyePassTolerance = profile.shouldCheckEyeHeightStrictly ? 0.006 : 0.010
+                let currentEyePercent = Int((eyeHeight * 100).rounded())
+                let targetEyeLowerPercent = Int((profile.eyeHeightRange.lowerBound * 100).rounded())
+                let targetEyeUpperPercent = Int((profile.eyeHeightRange.upperBound * 100).rounded())
+                let isEyeInsideOfficialRange = eyeHeight >= profile.eyeHeightRange.lowerBound
+                    && eyeHeight <= profile.eyeHeightRange.upperBound
+                let isEyeInsidePassRange = eyeHeight >= profile.eyeHeightRange.lowerBound - eyePassTolerance
+                    && eyeHeight <= profile.eyeHeightRange.upperBound + eyePassTolerance
+                let isEyeInsideWarningRange = eyeHeight >= profile.eyeHeightWarningRange.lowerBound
+                    && eyeHeight <= profile.eyeHeightWarningRange.upperBound
+                let eyeHeightGuideAligned =
+                    abs(faceAnalysis.effectiveVerticalCenterOffsetRatio) <= FaceAnalysis.verticalCenterWarningThreshold * 0.72
+                    && topMarginForCompliance(faceAnalysis: faceAnalysis) >= minimumTopMargin * 0.92
+                    && faceAnalysis.effectiveBottomMarginRatio >= minimumBottomMargin * 0.92
+                let eyeDirection = currentEyePercent < targetEyeLowerPercent ? VerticalGuidanceDirection.up
+                    : (currentEyePercent > targetEyeUpperPercent ? .down : nil)
+                let eyeHeightSeverity: ComplianceSeverity = if isEyeInsideOfficialRange || isEyeInsidePassRange {
+                    .pass
+                } else if isEyeInsideWarningRange
+                            && eyeHeightGuideAligned
+                            && profile.framingWeights.eyeHeight < 0.90 {
+                    .pass
+                } else if isEyeInsideWarningRange {
+                    .warning
+                } else if profile.shouldCheckEyeHeightStrictly {
+                    .fail
+                } else {
+                    .warning
+                }
                 let eyeAction: String? = if eyeHeightSeverity == .pass {
                     nil
-                } else if eyeHeight < 0.535 {
+                } else if currentEyePercent < targetEyeLowerPercent {
                     L10n.text(en: "Move the photo upward so the eyes sit higher in the frame.", zh: "请把照片向上移动，让眼睛位置更高一些。")
                 } else {
                     L10n.text(en: "Move the photo downward so the eyes sit lower in the frame.", zh: "请把照片向下移动，让眼睛位置更低一些。")
                 }
+                let eyeRangeKind = profile.shouldCheckEyeHeightStrictly
+                    ? L10n.text(en: "target", zh: "目标")
+                    : L10n.text(en: "reference", zh: "参考")
+                let eyeHeightMessage = L10n.isChinese
+                    ? "当前眼线约 \(currentEyePercent)%，\(eyeRangeKind)范围 \(targetEyeLowerPercent)-\(targetEyeUpperPercent)%；按最终整张证件照画布高度计算。"
+                    : "Current eye line is about \(currentEyePercent)%; \(eyeRangeKind) range is \(targetEyeLowerPercent)-\(targetEyeUpperPercent)%, measured against the final full photo canvas."
                 checks.append(ComplianceCheck(
                     title: L10n.text(en: "Eye height", zh: "眼线高度"),
-                    message: L10n.text(en: "Eye line is around \(Int(eyeHeight * 100))% from the bottom of the frame.", zh: "眼线约位于画面底部向上 \(Int(eyeHeight * 100))% 处。"),
+                    message: eyeHeightMessage,
                     severity: eyeHeightSeverity,
                     action: eyeAction,
                     kind: .eyeHeight
                 ))
             }
 
-            let topMargin = faceAnalysis.effectiveTopMarginRatio
-            let topMarginSeverity: ComplianceSeverity = if topMargin >= minimumTopMargin {
+            let topMargin = topMarginForCompliance(faceAnalysis: faceAnalysis)
+            let topMarginPercent = Int((topMargin * 100).rounded())
+            let minimumTopMarginPercent = Int((minimumTopMargin * 100).rounded())
+            let idealTopMarginUpper = min(max(minimumTopMargin + 0.035, (1 - spec.maxHeadRatio) * 0.72), 0.18)
+            let idealTopMarginUpperPercent = Int((idealTopMarginUpper * 100).rounded())
+            let viableTopMarginPercent = Int((profile.viableTopMarginRatio * 100).rounded())
+            let topRangeKind = profile.strictTopMargin
+                ? L10n.text(en: "target", zh: "目标")
+                : L10n.text(en: "reference", zh: "参考")
+            let topMarginSeverity: ComplianceSeverity = if topMarginPercent >= minimumTopMarginPercent {
                 .pass
-            } else if topMargin >= minimumTopMargin * 0.75 {
+            } else if topMarginPercent >= max(minimumTopMarginPercent - 2, 0) {
                 .warning
-            } else {
+            } else if profile.strictTopMargin {
                 .fail
+            } else {
+                .warning
             }
             checks.append(ComplianceCheck(
                 title: L10n.text(en: "Top margin", zh: "头顶留白"),
-                message: topMarginSeverity == .pass
-                    ? (L10n.text(en: "Top margin is within the expected range.", zh: "头顶留白在合理范围内。"))
-                    : (L10n.isChinese ? "头顶留白约 \(Int(topMargin * 100))%；建议至少 \(Int(minimumTopMargin * 100))%。" : "Top margin is about \(Int(topMargin * 100))%; recommended minimum is \(Int(minimumTopMargin * 100))%."),
+                message: L10n.isChinese
+                    ? "当前头顶留白约 \(topMarginPercent)%，\(topRangeKind)范围 \(minimumTopMarginPercent)-\(idealTopMarginUpperPercent)%；最低可接受约 \(viableTopMarginPercent)%。按当前国家和证件规格计算。"
+                    : "Current top margin is about \(topMarginPercent)%; \(topRangeKind) range is \(minimumTopMarginPercent)-\(idealTopMarginUpperPercent)%, with about \(viableTopMarginPercent)% as the lowest acceptable reference for this document type.",
                 severity: topMarginSeverity,
                 action: topMarginSeverity == .pass ? nil : (L10n.text(en: "Zoom out or move the photo downward so the full head has clear space above it.", zh: "请缩小或向下移动照片，确保完整头部上方有清晰留白。")),
                 kind: .topMargin
             ))
 
             let bottomMargin = faceAnalysis.effectiveBottomMarginRatio
-            let bottomMarginSeverity: ComplianceSeverity = if bottomMargin >= 0.10 {
+            let bottomMarginSeverity: ComplianceSeverity = if bottomMargin >= minimumBottomMargin {
                 .pass
-            } else if bottomMargin >= 0.065 {
+            } else if bottomMargin >= minimumBottomMargin * 0.70 {
                 .warning
-            } else {
+            } else if profile.strictBottomMargin {
                 .fail
+            } else {
+                .warning
             }
             checks.append(ComplianceCheck(
                 title: L10n.text(en: "Vertical position", zh: "垂直位置"),
                 message: bottomMarginSeverity == .pass
                     ? (L10n.text(en: "The head is not pushed too low in the frame.", zh: "头像没有明显偏向底部。"))
-                    : (L10n.isChinese ? "下方留白约 \(Int(bottomMargin * 100))%，头像明显偏底部。" : "Bottom margin is about \(Int(bottomMargin * 100))%; the head is too low in the frame."),
+                    : (L10n.isChinese ? "下方留白约 \(Int(bottomMargin * 100))%，建议至少 \(Int(minimumBottomMargin * 100))%。" : "Bottom margin is about \(Int(bottomMargin * 100))%; recommended minimum is \(Int(minimumBottomMargin * 100))%."),
                 severity: bottomMarginSeverity,
                 action: bottomMarginSeverity == .pass ? nil : (L10n.text(en: "Move the photo upward or use smart fix to recenter the head.", zh: "请把照片向上移动，或使用智能修复让头像重新居中。")),
-                kind: .eyeHeight
+                kind: .bottomMargin
             ))
 
-            let verticalCenterOffset = faceAnalysis.effectiveVerticalCenterOffsetRatio
-            let verticalCenterSeverity: ComplianceSeverity = if faceAnalysis.isVerticallyCenteredInGuide {
+            let verticalCenterOffset = guideAlignmentOffset(faceAnalysis: faceAnalysis, profile: profile)
+            let relaxedVerticalOffset = verticalCenterOffset
+            let verticalCenterSeverity: ComplianceSeverity = if !profile.shouldWarnHeadGuideAlignment {
                 .pass
-            } else if abs(verticalCenterOffset) <= FaceAnalysis.verticalCenterWarningThreshold {
+            } else if abs(relaxedVerticalOffset) <= FaceAnalysis.strictVerticalCenterPassThreshold {
+                .pass
+            } else if abs(relaxedVerticalOffset) <= FaceAnalysis.verticalCenterWarningThreshold {
                 .warning
             } else {
                 .fail
@@ -206,14 +292,14 @@ struct ComplianceService {
                 title: L10n.text(en: "Head guide alignment", zh: "头部引导框对齐"),
                 message: verticalCenterSeverity == .pass
                     ? L10n.text(en: "Full head position matches the guide oval.", zh: "完整头部位置已贴合参考虚线框。")
-                    : (verticalCenterOffset > 0
+                    : (relaxedVerticalOffset > 0
                        ? L10n.text(en: "The full head sits too low compared with the guide oval.", zh: "完整头部相对参考虚线框偏低。")
                        : L10n.text(en: "The full head sits too high compared with the guide oval.", zh: "完整头部相对参考虚线框偏高。")),
                 severity: verticalCenterSeverity,
-                action: verticalCenterSeverity == .pass ? nil : (verticalCenterOffset > 0
+                action: verticalCenterSeverity == .pass ? nil : (relaxedVerticalOffset > 0
                     ? L10n.text(en: "Move the photo upward until the head is centered in the guide.", zh: "请把照片向上移动，让完整头部进入虚线框中心。")
                     : L10n.text(en: "Move the photo downward until the head is centered in the guide.", zh: "请把照片向下移动，让完整头部进入虚线框中心。")),
-                kind: .topMargin
+                kind: .headGuideAlignment
             ))
 
             checks.append(ComplianceCheck(
@@ -309,8 +395,104 @@ struct ComplianceService {
     }
 
     private func strictTopMarginRatio(for spec: PhotoSpec) -> Double {
-        let isUSPassport = spec.country.lowercased().contains("united states")
-            && spec.title.lowercased().contains("passport")
-        return isUSPassport ? 0.06 : 0.045
+        spec.complianceProfile.minimumTopMarginRatio
+    }
+
+    private func guideAlignmentOffset(faceAnalysis: FaceAnalysis, profile: PhotoComplianceProfile) -> Double {
+        let eyeTargetRatio = (profile.eyeHeightRange.lowerBound + profile.eyeHeightRange.upperBound) / 2
+        let targetTop = guideTopRatioForEyeAlignedHead(profile: profile, eyeTargetRatio: eyeTargetRatio)
+        let targetCenter = targetTop + profile.targetHeadRatio / 2
+        let actualCenter = topMarginForCompliance(faceAnalysis: faceAnalysis) + faceAnalysis.effectiveHeadHeightRatio / 2
+        return actualCenter - targetCenter
+    }
+
+    private func topMarginForCompliance(faceAnalysis: FaceAnalysis) -> Double {
+        guard let eyeHeight = faceAnalysis.eyeHeightRatio else {
+            return faceAnalysis.effectiveTopMarginRatio
+        }
+        let normalEyePositionWithinHead = GuideFramingCalculator.eyePositionWithinHead
+        let inferredTopMargin = (1 - eyeHeight) - faceAnalysis.effectiveHeadHeightRatio * normalEyePositionWithinHead
+        return max(faceAnalysis.effectiveTopMarginRatio, min(max(inferredTopMargin, 0), 1))
+    }
+
+    private func guideTopRatioForEyeAlignedHead(profile: PhotoComplianceProfile, eyeTargetRatio: Double) -> Double {
+        GuideFramingCalculator.guideTopRatio(
+            headRatio: profile.targetHeadRatio,
+            eyeTargetRatio: eyeTargetRatio,
+            profile: profile
+        )
+    }
+
+    private func resolvedVerticalGuidanceDirection(
+        faceAnalysis: FaceAnalysis,
+        profile: PhotoComplianceProfile,
+        minimumTopMargin: Double,
+        minimumBottomMargin: Double
+    ) -> VerticalGuidanceDirection? {
+        let relaxedVerticalOffset = guideAlignmentOffset(faceAnalysis: faceAnalysis, profile: profile)
+        let topGap = minimumTopMargin - topMarginForCompliance(faceAnalysis: faceAnalysis)
+        let bottomGap = minimumBottomMargin - faceAnalysis.effectiveBottomMarginRatio
+
+        if relaxedVerticalOffset > FaceAnalysis.verticalCenterWarningThreshold {
+            return .up
+        }
+        if relaxedVerticalOffset < -FaceAnalysis.verticalCenterWarningThreshold {
+            return .down
+        }
+        if topGap > 0.018 {
+            return .down
+        }
+        if bottomGap > 0.018 {
+            return .up
+        }
+
+        guard
+            profile.shouldDriveEyeHeightAutoFix,
+            let eyeHeight = faceAnalysis.eyeHeightRatio
+        else {
+            return nil
+        }
+
+        if eyeHeight < profile.eyeHeightRange.lowerBound - 0.026 {
+            return .up
+        }
+        if eyeHeight > profile.eyeHeightRange.upperBound + 0.026 {
+            return .down
+        }
+        return nil
+    }
+
+    private func makeGlassesCheck(policy: GlassesPolicy, faceAnalysis: FaceAnalysis) -> ComplianceCheck? {
+        switch policy {
+        case .disallow:
+            guard faceAnalysis.hasGlassesRisk && faceAnalysis.hasGlareRisk else { return nil }
+            return ComplianceCheck(
+                title: L10n.text(en: "Glasses", zh: "眼镜"),
+                message: L10n.text(en: "Possible glasses and lens glare were detected around the eyes.", zh: "眼部附近可能存在眼镜和镜片反光。"),
+                severity: .warning,
+                action: L10n.text(en: "If you are wearing glasses, retake without glasses. If not, ignore this warning.", zh: "如果确实佩戴眼镜，请摘掉重拍；如果没有佩戴，可忽略此提示。"),
+                kind: .glasses
+            )
+        case .discourage:
+            guard faceAnalysis.hasGlassesRisk && faceAnalysis.hasGlareRisk else { return nil }
+            return ComplianceCheck(
+                title: L10n.text(en: "Glasses", zh: "眼镜"),
+                message: L10n.text(en: "Possible glasses glare was detected around the eyes.", zh: "眼部附近可能存在眼镜反光。"),
+                severity: .warning,
+                action: L10n.text(en: "Retake without glasses, or ensure the eyes are fully visible with no glare.", zh: "建议摘掉眼镜重拍，或确保双眼无遮挡且没有反光。"),
+                kind: .glasses
+            )
+        case .allowIfClear:
+            guard faceAnalysis.hasGlassesRisk && faceAnalysis.hasGlareRisk else { return nil }
+            return ComplianceCheck(
+                title: L10n.text(en: "Glasses / glare", zh: "眼镜/反光"),
+                message: L10n.text(en: "Possible glasses glare was detected around the eyes.", zh: "眼部附近可能存在眼镜反光。"),
+                severity: .warning,
+                action: L10n.text(en: "Reduce glare, avoid tinted lenses, and keep both eyes fully visible.", zh: "请减少反光，避免有色镜片，并确保双眼完全可见。"),
+                kind: .glasses
+            )
+        case .unknown:
+            return nil
+        }
     }
 }

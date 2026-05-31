@@ -16,8 +16,13 @@ enum ComplianceIssueKind {
     case faceCentered
     case headTilt
     case eyesVisible
+    case eyesOpen
+    case glasses
     case eyeHeight
     case topMargin
+    case bottomMargin
+    case headGuideAlignment
+    case headCover
     case expression
     case faceDetection
     case lighting
@@ -76,8 +81,11 @@ struct FaceAnalysis: Equatable {
     let centerOffsetRatio: Double
     let signedCenterOffsetRatio: Double
     let rollDegrees: Double
+    let eyeLineRollDegrees: Double?
     let quality: Double
     let eyeHeightRatio: Double?
+    let eyeCenterXRatio: Double?
+    let noseCenterXRatio: Double?
     let topMarginRatio: Double
     let bottomMarginRatio: Double
     let visualTopMarginRatio: Double?
@@ -86,25 +94,61 @@ struct FaceAnalysis: Equatable {
     let visualSignedCenterOffsetRatio: Double?
     let visualHeadRect: CGRect?
     let hasBothEyes: Bool
+    let eyesOpenScore: Double?
+    let hasGlassesRisk: Bool
+    let hasGlareRisk: Bool
+    let hasHeadCoveringRisk: Bool
     let hasMouth: Bool
 
-    static let strictCenterPassThreshold = 0.018
-    static let centerWarningThreshold = 0.040
-    static let centerAgreementThreshold = 0.025
-    static let strictVerticalCenterPassThreshold = 0.035
-    static let verticalCenterWarningThreshold = 0.060
+    static let strictCenterPassThreshold = 0.050
+    static let centerWarningThreshold = 0.085
+    static let centerAgreementThreshold = 0.075
+    static let strictVerticalCenterPassThreshold = 0.040
+    static let verticalCenterWarningThreshold = 0.072
 
     var effectiveSignedCenterOffsetRatio: Double {
+        if let facialCenterlineOffsetRatio {
+            guard let visualSignedCenterOffsetRatio else {
+                return facialCenterlineOffsetRatio
+            }
+            if abs(visualSignedCenterOffsetRatio - facialCenterlineOffsetRatio) <= Self.centerAgreementThreshold {
+                return facialCenterlineOffsetRatio * 0.78 + visualSignedCenterOffsetRatio * 0.22
+            }
+            return facialCenterlineOffsetRatio
+        }
+
         guard let visualSignedCenterOffsetRatio else {
             return signedCenterOffsetRatio
         }
-        return abs(visualSignedCenterOffsetRatio) >= abs(signedCenterOffsetRatio)
-            ? visualSignedCenterOffsetRatio
-            : signedCenterOffsetRatio
+        if abs(visualSignedCenterOffsetRatio - signedCenterOffsetRatio) <= Self.centerAgreementThreshold {
+            return signedCenterOffsetRatio * 0.35 + visualSignedCenterOffsetRatio * 0.65
+        }
+        if abs(visualSignedCenterOffsetRatio - signedCenterOffsetRatio) <= Self.centerAgreementThreshold * 1.6 {
+            return signedCenterOffsetRatio * 0.58 + visualSignedCenterOffsetRatio * 0.42
+        }
+        return signedCenterOffsetRatio
+    }
+
+    var facialCenterlineOffsetRatio: Double? {
+        switch (eyeCenterXRatio, noseCenterXRatio) {
+        case let (eyeX?, noseX?):
+            return (eyeX * 0.58 + noseX * 0.42) - 0.5
+        case let (eyeX?, nil):
+            return eyeX - 0.5
+        case let (nil, noseX?):
+            return noseX - 0.5
+        default:
+            return nil
+        }
+    }
+
+    var eyeNoseCenterlineGapRatio: Double? {
+        guard let eyeCenterXRatio, let noseCenterXRatio else { return nil }
+        return abs(eyeCenterXRatio - noseCenterXRatio)
     }
 
     var effectiveCenterOffsetRatio: Double {
-        max(abs(signedCenterOffsetRatio), abs(visualSignedCenterOffsetRatio ?? signedCenterOffsetRatio))
+        abs(effectiveSignedCenterOffsetRatio)
     }
 
     var visualAndFaceCentersAgree: Bool {
@@ -113,7 +157,7 @@ struct FaceAnalysis: Equatable {
     }
 
     var isCentered: Bool {
-        effectiveCenterOffsetRatio <= Self.strictCenterPassThreshold && visualAndFaceCentersAgree
+        effectiveCenterOffsetRatio <= Self.strictCenterPassThreshold
     }
 
     var effectiveTopMarginRatio: Double {
@@ -134,6 +178,13 @@ struct FaceAnalysis: Equatable {
 
     var isVerticallyCenteredInGuide: Bool {
         abs(effectiveVerticalCenterOffsetRatio) <= Self.strictVerticalCenterPassThreshold
+    }
+
+    var dominantLevelAngleDegrees: Double {
+        if let eyeLineRollDegrees, abs(eyeLineRollDegrees) >= 0.35 {
+            return eyeLineRollDegrees
+        }
+        return rollDegrees
     }
 }
 

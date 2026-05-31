@@ -17,7 +17,7 @@ struct PhotoRenderer {
         return renderer.image { context in
             UIColor(background.color).setFill()
             context.fill(CGRect(origin: .zero, size: targetSize))
-            drawEdited(image: adjusted, in: targetSize, context: context.cgContext, editState: editState)
+            drawEdited(image: adjusted, in: targetSize, context: context.cgContext, editState: editState, renderScale: scale)
         }
     }
 
@@ -191,10 +191,13 @@ struct PhotoRenderer {
         }
     }
 
-    private func drawEdited(image: UIImage, in targetSize: CGSize, context: CGContext, editState: PhotoEditState) {
+    private func drawEdited(image: UIImage, in targetSize: CGSize, context: CGContext, editState: PhotoEditState, renderScale: CGFloat) {
         let baseRect = aspectFillRect(imageSize: image.size, targetSize: targetSize)
         context.saveGState()
-        context.translateBy(x: targetSize.width / 2 + editState.offset.width, y: targetSize.height / 2 + editState.offset.height)
+        context.translateBy(
+            x: targetSize.width / 2 + editState.offset.width * renderScale,
+            y: targetSize.height / 2 + editState.offset.height * renderScale
+        )
         context.rotate(by: CGFloat(editState.rotationDegrees * .pi / 180))
         context.scaleBy(x: editState.scale, y: editState.scale)
         let drawRect = CGRect(x: -baseRect.width / 2, y: -baseRect.height / 2, width: baseRect.width, height: baseRect.height)
@@ -524,7 +527,7 @@ struct PhotoRenderer {
         }
 
         let faceRect = denormalize(faceAnalysis.faceRect, imageSize: imageSize)
-        let targetHeadRatio = CGFloat((spec.minHeadRatio + spec.maxHeadRatio) / 2)
+        let targetHeadRatio = CGFloat(spec.complianceProfile.targetHeadRatio)
         var cropHeight = faceRect.height / max(targetHeadRatio, 0.1)
         var cropWidth = cropHeight * targetRatio
 

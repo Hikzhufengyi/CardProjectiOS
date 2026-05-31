@@ -102,6 +102,369 @@ struct PhotoSpec: Identifiable, Hashable {
         tokens.append(contentsOf: localizedNotes ?? [])
         return tokens.joined(separator: " ").lowercased()
     }
+
+    var complianceProfile: PhotoComplianceProfile {
+        PhotoComplianceProfile(spec: self)
+    }
+}
+
+struct PhotoComplianceProfile: Hashable {
+    let glassesPolicy: GlassesPolicy
+    let isUSSquareStyle: Bool
+    let framingWeights: FramingWeights
+    let targetHeadRatio: Double
+    let headPassTolerance: Double
+    let headWarningTolerance: Double
+    let eyeHeightRange: ClosedRange<Double>
+    let eyeHeightWarningRange: ClosedRange<Double>
+    let minimumTopMarginRatio: Double
+    let minimumBottomMarginRatio: Double
+    let viableTopMarginRatio: Double
+    let viableBottomMarginRatio: Double
+    let viableEyeHeightRange: ClosedRange<Double>
+    let strictTopMargin: Bool
+    let strictBottomMargin: Bool
+
+    var shouldDriveEyeHeightAutoFix: Bool {
+        framingWeights.eyeHeight >= 0.70
+    }
+
+    var shouldCheckEyeHeightStrictly: Bool {
+        framingWeights.eyeHeight >= 0.85
+    }
+
+    var shouldWarnHeadGuideAlignment: Bool {
+        framingWeights.guide >= 0.22
+    }
+
+    init(spec: PhotoSpec) {
+        let headRange = max(spec.maxHeadRatio - spec.minHeadRatio, 0.02)
+        let midpoint = (spec.minHeadRatio + spec.maxHeadRatio) / 2
+        let countryKey = spec.country.lowercased()
+        let titleKey = spec.title.lowercased()
+        let aspectRatio = spec.heightMM / max(spec.widthMM, 1)
+        let isSchengenLike = FramingClassifiers.isSchengenLike(countryKey: countryKey, titleKey: titleKey)
+        let isAsian = FramingClassifiers.isAsian(countryKey: countryKey)
+        let isOfficialDocument = spec.category != .print
+        let isLongDocument = aspectRatio >= 1.32
+        let isSquareUSStyle = spec.widthMM == spec.heightMM
+            && spec.minHeadRatio <= 0.52
+            && spec.maxHeadRatio >= 0.68
+            && (countryKey.contains("united states")
+                || titleKey.contains("2 x 2")
+                || titleKey.contains("square digital"))
+
+        if countryKey.contains("united states") || titleKey.contains("uscis") || titleKey.contains("dv lottery") {
+            glassesPolicy = .disallow
+        } else if countryKey.contains("australia") {
+            glassesPolicy = .disallow
+        } else if countryKey.contains("united kingdom") {
+            glassesPolicy = .discourage
+        } else if countryKey.contains("canada") {
+            glassesPolicy = .allowIfClear
+        } else if countryKey.contains("japan") {
+            glassesPolicy = .allowIfClear
+        } else if countryKey.contains("schengen") || countryKey.contains("european union") || countryKey.contains("china") || countryKey.contains("india") {
+            glassesPolicy = .allowIfClear
+        } else {
+            glassesPolicy = .unknown
+        }
+
+        isUSSquareStyle = isSquareUSStyle
+        framingWeights = FramingWeights(spec: spec, isUSSquareStyle: isSquareUSStyle)
+        let eyeLineRule = EyeLineRule(spec: spec, isUSSquareStyle: isSquareUSStyle)
+
+        if isSquareUSStyle {
+            targetHeadRatio = 0.62
+            eyeHeightRange = eyeLineRule.passRange
+            eyeHeightWarningRange = eyeLineRule.warningRange
+            minimumTopMarginRatio = 0.08
+            minimumBottomMarginRatio = 0.14
+            viableTopMarginRatio = 0.055
+            viableBottomMarginRatio = 0.105
+            viableEyeHeightRange = eyeLineRule.viableRange
+            strictTopMargin = true
+            strictBottomMargin = true
+        } else {
+            targetHeadRatio = min(max(midpoint, spec.minHeadRatio + 0.015), spec.maxHeadRatio - 0.015)
+            eyeHeightRange = eyeLineRule.passRange
+            eyeHeightWarningRange = eyeLineRule.warningRange
+            let marginRule = MarginRule(spec: spec)
+            minimumTopMarginRatio = marginRule.top
+            minimumBottomMarginRatio = marginRule.bottom
+            viableTopMarginRatio = max(minimumTopMarginRatio * 0.72, 0.025)
+            viableBottomMarginRatio = max(minimumBottomMarginRatio * 0.70, 0.055)
+            viableEyeHeightRange = eyeLineRule.viableRange
+            strictTopMargin = isOfficialDocument && (framingWeights.margins >= 1.08 || isLongDocument || isSchengenLike || isAsian)
+            strictBottomMargin = isOfficialDocument && (framingWeights.margins >= 1.08 || isLongDocument || countryKey.contains("canada"))
+        }
+
+        headPassTolerance = max(headRange * 0.24, 0.018)
+        headWarningTolerance = max(headRange * 0.46, 0.040)
+    }
+}
+
+struct EyeLineRule: Hashable {
+    let targetRatio: Double
+    let tolerance: Double
+
+    var passRange: ClosedRange<Double> {
+        clampedRange(center: targetRatio, tolerance: tolerance)
+    }
+
+    var warningRange: ClosedRange<Double> {
+        clampedRange(center: targetRatio, tolerance: tolerance * 1.85)
+    }
+
+    var viableRange: ClosedRange<Double> {
+        clampedRange(center: targetRatio, tolerance: tolerance * 2.4)
+    }
+
+    init(spec: PhotoSpec, isUSSquareStyle: Bool) {
+        let countryKey = spec.country.lowercased()
+        let titleKey = spec.title.lowercased()
+        let aspectRatio = spec.heightMM / max(spec.widthMM, 1)
+        let headRange = max(spec.maxHeadRatio - spec.minHeadRatio, 0.02)
+        let isSchengenLike = FramingClassifiers.isSchengenLike(countryKey: countryKey, titleKey: titleKey)
+        let isAsian = FramingClassifiers.isAsian(countryKey: countryKey)
+
+        if isUSSquareStyle {
+            targetRatio = 0.605
+            tolerance = 0.030
+        } else if isSchengenLike {
+            targetRatio = 0.555
+            tolerance = 0.035
+        } else if countryKey.contains("united kingdom")
+                    || countryKey.contains("australia")
+                    || countryKey.contains("new zealand") {
+            targetRatio = 0.565
+            tolerance = 0.040
+        } else if countryKey.contains("canada") {
+            targetRatio = 0.545
+            tolerance = 0.028
+        } else if isAsian {
+            targetRatio = aspectRatio >= 1.35 ? 0.550 : 0.560
+            tolerance = 0.042
+        } else if spec.category == .print {
+            targetRatio = aspectRatio > 1.25 ? 0.550 : 0.585
+            tolerance = 0.045
+        } else {
+            let ratioBias = min(max((aspectRatio - 1.0) * 0.055, 0.0), 0.050)
+            targetRatio = min(max(0.575 - ratioBias, 0.535), 0.590)
+            tolerance = max(0.032, min(0.045, headRange * 0.22))
+        }
+    }
+
+    private func clampedRange(center: Double, tolerance: Double) -> ClosedRange<Double> {
+        max(0.48, center - tolerance)...min(0.68, center + tolerance)
+    }
+}
+
+private struct MarginRule: Hashable {
+    let top: Double
+    let bottom: Double
+
+    init(spec: PhotoSpec) {
+        let countryKey = spec.country.lowercased()
+        let titleKey = spec.title.lowercased()
+        let aspectRatio = spec.heightMM / max(spec.widthMM, 1)
+        let baseTop = min(max((1 - spec.maxHeadRatio) * 0.22, 0.035), 0.075)
+        let baseBottom = min(max((1 - spec.maxHeadRatio) * 0.42, 0.08), 0.16)
+        let isSchengenLike = FramingClassifiers.isSchengenLike(countryKey: countryKey, titleKey: titleKey)
+        let isAsian = FramingClassifiers.isAsian(countryKey: countryKey)
+
+        if countryKey.contains("canada") && spec.heightMM >= 65 {
+            top = 0.075
+            bottom = 0.18
+        } else if isSchengenLike || countryKey.contains("european union") {
+            top = 0.035
+            bottom = 0.090
+        } else if countryKey.contains("united kingdom")
+                    || countryKey.contains("australia")
+                    || countryKey.contains("new zealand") {
+            top = 0.065
+            bottom = 0.095
+        } else if countryKey.contains("china") || titleKey.contains("33 x 48") {
+            top = 0.045
+            bottom = 0.105
+        } else if isAsian {
+            top = 0.045
+            bottom = aspectRatio >= 1.35 ? 0.115 : 0.095
+        } else if aspectRatio >= 1.42 {
+            top = max(baseTop, 0.050)
+            bottom = max(baseBottom, 0.115)
+        } else if aspectRatio <= 1.05 {
+            top = max(baseTop, 0.052)
+            bottom = max(baseBottom, 0.115)
+        } else {
+            top = baseTop
+            bottom = baseBottom
+        }
+    }
+}
+
+private enum FramingClassifiers {
+    static func isSchengenLike(countryKey: String, titleKey: String) -> Bool {
+        countryKey.contains("schengen")
+            || countryKey.contains("european union")
+            || countryKey.contains("germany")
+            || countryKey.contains("france")
+            || countryKey.contains("italy")
+            || countryKey.contains("spain")
+            || countryKey.contains("netherlands")
+            || countryKey.contains("switzerland")
+            || countryKey.contains("sweden")
+            || countryKey.contains("norway")
+            || countryKey.contains("denmark")
+            || countryKey.contains("finland")
+            || countryKey.contains("austria")
+            || countryKey.contains("belgium")
+            || countryKey.contains("portugal")
+            || countryKey.contains("poland")
+            || countryKey.contains("czech")
+            || countryKey.contains("greece")
+            || titleKey.contains("schengen")
+            || titleKey.contains("eu ")
+    }
+
+    static func isAsian(countryKey: String) -> Bool {
+        countryKey.contains("china")
+            || countryKey.contains("japan")
+            || countryKey.contains("south korea")
+            || countryKey.contains("singapore")
+            || countryKey.contains("india")
+    }
+}
+
+struct FramingWeights: Hashable {
+    let headSize: Double
+    let margins: Double
+    let eyeHeight: Double
+    let center: Double
+    let tilt: Double
+    let visualAgreement: Double
+    let guide: Double
+
+    init(
+        headSize: Double,
+        margins: Double,
+        eyeHeight: Double,
+        center: Double,
+        tilt: Double,
+        visualAgreement: Double,
+        guide: Double
+    ) {
+        self.headSize = headSize
+        self.margins = margins
+        self.eyeHeight = eyeHeight
+        self.center = center
+        self.tilt = tilt
+        self.visualAgreement = visualAgreement
+        self.guide = guide
+    }
+
+    init(spec: PhotoSpec, isUSSquareStyle: Bool) {
+        let countryKey = spec.country.lowercased()
+        let titleKey = spec.title.lowercased()
+        let isPrintTemplate = spec.category == .print
+        let isNorthAmerican = countryKey.contains("canada")
+            || countryKey.contains("mexico")
+        let isUKOrOceania = countryKey.contains("united kingdom")
+            || countryKey.contains("australia")
+            || countryKey.contains("new zealand")
+        let isSchengenLike = FramingClassifiers.isSchengenLike(countryKey: countryKey, titleKey: titleKey)
+        let isAsian = FramingClassifiers.isAsian(countryKey: countryKey)
+
+        if isUSSquareStyle {
+            self.init(
+                headSize: 1.35,
+                margins: 1.28,
+                eyeHeight: 1.10,
+                center: 1.00,
+                tilt: 1.00,
+                visualAgreement: 1.00,
+                guide: 0.18
+            )
+        } else if isPrintTemplate {
+            let squareOfficialStyle = spec.widthMM == spec.heightMM && spec.maxHeadRatio >= 0.68
+            self.init(
+                headSize: 1.00,
+                margins: 0.92,
+                eyeHeight: squareOfficialStyle ? 0.86 : 0.52,
+                center: 0.92,
+                tilt: 0.90,
+                visualAgreement: 0.88,
+                guide: 0.10
+            )
+        } else if isNorthAmerican {
+            self.init(
+                headSize: 1.24,
+                margins: countryKey.contains("canada") ? 1.34 : 1.20,
+                eyeHeight: countryKey.contains("canada") ? 0.92 : 0.60,
+                center: 1.05,
+                tilt: 0.96,
+                visualAgreement: 0.92,
+                guide: 0.14
+            )
+        } else if isUKOrOceania {
+            self.init(
+                headSize: 1.24,
+                margins: 1.10,
+                eyeHeight: 0.78,
+                center: 0.96,
+                tilt: 0.96,
+                visualAgreement: 0.92,
+                guide: 0.15
+            )
+        } else if isSchengenLike {
+            self.init(
+                headSize: 1.22,
+                margins: 1.00,
+                eyeHeight: 1.08,
+                center: 0.86,
+                tilt: 0.94,
+                visualAgreement: 0.90,
+                guide: 0.16
+            )
+        } else if isAsian {
+            self.init(
+                headSize: 1.06,
+                margins: 1.25,
+                eyeHeight: 0.58,
+                center: 1.10,
+                tilt: 0.96,
+                visualAgreement: 0.95,
+                guide: 0.16
+            )
+        } else if spec.category == .passport {
+            self.init(
+                headSize: 1.18,
+                margins: 1.08,
+                eyeHeight: 0.76,
+                center: 0.96,
+                tilt: 0.96,
+                visualAgreement: 0.92,
+                guide: 0.16
+            )
+        } else {
+            self.init(
+                headSize: 1.05,
+                margins: 1.00,
+                eyeHeight: 0.86,
+                center: 0.92,
+                tilt: 0.92,
+                visualAgreement: 0.90,
+                guide: 0.14
+            )
+        }
+    }
+}
+
+enum GlassesPolicy: Hashable {
+    case disallow
+    case discourage
+    case allowIfClear
+    case unknown
 }
 
 enum PhotoBackground: String, CaseIterable, Identifiable {
