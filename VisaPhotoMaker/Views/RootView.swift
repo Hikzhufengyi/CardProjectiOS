@@ -24,6 +24,7 @@ struct RootView: View {
         }
         .background(AppTheme.groupedBackground.ignoresSafeArea())
         .preferredColorScheme(nil)
+        .environment(\.layoutDirection, L10n.layoutDirection)
         .task {
             try? await Task.sleep(for: .seconds(0.45))
             withAnimation(.easeInOut(duration: 0.25)) {

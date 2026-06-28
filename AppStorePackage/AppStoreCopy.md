@@ -10,7 +10,7 @@ Passport & visa photo maker
 Create official-size passport and visa photos with on-device checks, private processing, 300 DPI export, target-KB compression, and print layouts.
 
 ## Keywords
-passport photo,visa photo,id photo,photo maker,green card,schengen,US passport,UK visa,Canada PR,photo print,photo resize,background
+passport photo,visa photo,id photo,photo maker,green card,schengen,iqama,emirates id,civil id,GCC,Saudi visa,UAE visa,photo print,background
 
 ## Description
 IDPhoto Pro helps you create official-size passport, visa, immigration, and ID photos directly on your iPhone.
@@ -19,6 +19,7 @@ Choose a country or document preset, import or take a clear front-facing photo, 
 
 Key features:
 - Official-size templates for passports, visas, immigration cards, and common ID photo formats
+- GCC presets for Saudi Iqama, UAE Emirates ID, Qatar residence permit, Kuwait Civil ID, Oman residence card, and Bahrain CPR-style workflows
 - On-device compliance checks for face position, head size, sharpness, background, and file size guidance
 - Precise crop, zoom, rotation, brightness, contrast, sharpness, and light repair controls
 - Plain background replacement with common white, off-white, light gray, and blue options
@@ -47,3 +48,11 @@ Suggested price test: US$2.99 or US$4.99 one-time purchase.
 
 ## Review Notes
 IDPhoto Pro uses Apple Vision and on-device image processing to evaluate and prepare photos locally. It does not claim government affiliation, certification, or guaranteed acceptance.
+
+## GCC / Middle East Localization Notes
+
+Use for Arabic or GCC custom product pages:
+
+- Focus keywords: Saudi Iqama photo, Emirates ID photo, Kuwait Civil ID photo, Qatar residence permit photo, Oman residence card photo, Bahrain CPR photo, GCC ID photo
+- Positioning: private on-device workflow, white-background ID photos, 300 DPI export, target-KB compression, print layouts
+- Avoid: official app, approved by government, guaranteed accepted, embassy approved

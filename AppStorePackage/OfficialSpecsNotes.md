@@ -33,6 +33,12 @@ Avoid:
 | South Korea Passport / Visa | 35 x 45 mm | White | Avoid hair covering eyebrows/eyes. |
 | India Visa | Square upload common | White/light | Online portal rules can vary by visa type. |
 | China Visa | 33 x 48 mm | White or near-white | Head height and margins are often strict. |
+| Saudi Iqama | 4 x 6 cm | White | Verify Absher, Muqeem, or service-center instructions before release. |
+| UAE Emirates ID | 4 x 6 cm | White | Verify ICP or Emirates ID service-channel instructions before release. |
+| Qatar Residence Permit | 4 x 6 cm | White | Verify Metrash or receiving-channel instructions before release. |
+| Kuwait Civil ID | 4 x 6 cm | White | Verify PACI or service-center instructions before release. |
+| Oman Residence Card | 4 x 6 cm | White | Verify Royal Oman Police or receiving-channel instructions before release. |
+| Bahrain CPR / Residence Permit | 4 x 6 cm | White | Verify current Bahrain service-channel instructions before release. |
 | 4x6 Print Sheet | 101.6 x 152.4 mm | N/A | Use 300 DPI, optional crop marks, and repeated photos. |
 
 ## Release Checklist
@@ -42,3 +48,4 @@ Avoid:
 - Keep disclaimers visible in the privacy page and export flow.
 - Do not show fake seals or certification badges in screenshots.
 - Test export files on a real device and inspect KB size after compression.
+- For Arabic QA, test right-to-left layout, country filters, document cards, export controls, and checklist rows on small iPhones.

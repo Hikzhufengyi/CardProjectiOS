@@ -5,7 +5,7 @@ Use a clean white background, deep blue `#0047AB`, dark gray text, and real app 
 ## Screenshot 1: Template Selection
 Headline: Official-Size Passport & Visa Templates
 
-Subtext: Choose from common passport, visa, immigration, and print photo presets.
+Subtext: Choose from passport, visa, immigration, GCC ID, and print photo presets.
 
 Screen: Create tab with country filters and document cards visible.
 
@@ -38,8 +38,19 @@ Subtext: No photo uploads, no ads, no third-party analytics SDKs in this version
 Screen: Privacy, Security & Disclaimer page.
 
 ## App Preview Video Outline
-1. Select U.S. Passport or Schengen Visa.
+1. Select U.S. Passport, Schengen Visa, or Saudi Iqama / Emirates ID for a GCC variant.
 2. Import a clear front-facing photo.
 3. Show sticky preview, head guide, and compliance checklist.
 4. Change background and make subtle adjustments.
 5. Export 300 DPI JPG or 4x6 print sheet.
+
+## GCC Custom Product Page Variant
+
+Screenshot headline ideas:
+
+- GCC ID & Residence Photos
+- Iqama, Emirates ID, Civil ID
+- White Background, Local Checks
+- Private On-Device Export
+
+Use real app screens showing Saudi Arabia, United Arab Emirates, Qatar, Kuwait, Oman, and Bahrain filters or document cards. Do not use government seals, flags as approval marks, or guaranteed-acceptance claims.

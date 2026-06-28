@@ -25,8 +25,10 @@ struct PhotoSpec: Identifiable, Hashable {
     let id: String
     let country: String
     let localizedCountry: String?
+    let arabicCountry: String?
     let title: String
     let localizedTitle: String?
+    let arabicTitle: String?
     let category: SpecCategory
     let widthMM: Double
     let heightMM: Double
@@ -38,13 +40,16 @@ struct PhotoSpec: Identifiable, Hashable {
     let sourceURL: URL?
     let notes: [String]
     let localizedNotes: [String]?
+    let arabicNotes: [String]?
 
     init(
         id: String,
         country: String,
         localizedCountry: String? = nil,
+        arabicCountry: String? = nil,
         title: String,
         localizedTitle: String? = nil,
+        arabicTitle: String? = nil,
         category: SpecCategory,
         widthMM: Double,
         heightMM: Double,
@@ -55,13 +60,16 @@ struct PhotoSpec: Identifiable, Hashable {
         maxFileKB: Int?,
         sourceURL: URL?,
         notes: [String],
-        localizedNotes: [String]? = nil
+        localizedNotes: [String]? = nil,
+        arabicNotes: [String]? = nil
     ) {
         self.id = id
         self.country = country
         self.localizedCountry = localizedCountry
+        self.arabicCountry = arabicCountry
         self.title = title
         self.localizedTitle = localizedTitle
+        self.arabicTitle = arabicTitle
         self.category = category
         self.widthMM = widthMM
         self.heightMM = heightMM
@@ -73,6 +81,7 @@ struct PhotoSpec: Identifiable, Hashable {
         self.sourceURL = sourceURL
         self.notes = notes
         self.localizedNotes = localizedNotes
+        self.arabicNotes = arabicNotes
     }
 
     var displaySize: String {
@@ -84,15 +93,33 @@ struct PhotoSpec: Identifiable, Hashable {
     }
 
     var displayCountry: String {
-        L10n.isChinese ? (localizedCountry ?? country) : country
+        if L10n.isChinese {
+            return localizedCountry ?? country
+        }
+        if L10n.isArabic {
+            return arabicCountry ?? country
+        }
+        return country
     }
 
     var displayTitle: String {
-        L10n.isChinese ? (localizedTitle ?? title) : title
+        if L10n.isChinese {
+            return localizedTitle ?? title
+        }
+        if L10n.isArabic {
+            return arabicTitle ?? title
+        }
+        return title
     }
 
     var displayNotes: [String] {
-        L10n.isChinese ? (localizedNotes ?? notes) : notes
+        if L10n.isChinese {
+            return localizedNotes ?? notes
+        }
+        if L10n.isArabic {
+            return arabicNotes ?? notes
+        }
+        return notes
     }
 
     var searchableText: String {
@@ -100,6 +127,9 @@ struct PhotoSpec: Identifiable, Hashable {
         if let localizedCountry { tokens.append(localizedCountry) }
         if let localizedTitle { tokens.append(localizedTitle) }
         tokens.append(contentsOf: localizedNotes ?? [])
+        if let arabicCountry { tokens.append(arabicCountry) }
+        if let arabicTitle { tokens.append(arabicTitle) }
+        tokens.append(contentsOf: arabicNotes ?? [])
         return tokens.joined(separator: " ").lowercased()
     }
 
@@ -692,6 +722,10 @@ extension PhotoSpec {
         passport("hong-kong-passport", "Hong Kong", "中国香港", 40, 50, CGSize(width: 472, height: 591), 0.56, 0.74, [.white]),
         passport("uae-passport", "United Arab Emirates", "阿联酋", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white]),
         passport("saudi-passport", "Saudi Arabia", "沙特阿拉伯", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white]),
+        passport("qatar-passport", "Qatar", "卡塔尔", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white]),
+        passport("kuwait-passport", "Kuwait", "科威特", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white]),
+        passport("oman-passport", "Oman", "阿曼", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white]),
+        passport("bahrain-passport", "Bahrain", "巴林", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white]),
         passport("israel-passport", "Israel", "以色列", 35, 45, CGSize(width: 413, height: 531), 0.60, 0.75, [.white, .lightGray]),
         passport("south-africa-passport", "South Africa", "南非", 35, 45, CGSize(width: 413, height: 531), 0.60, 0.75, [.white, .lightGray]),
         passport("new-zealand-passport", "New Zealand", "新西兰", 35, 45, CGSize(width: 420, height: 540), 0.64, 0.80, [.white, .offWhite])
@@ -715,6 +749,10 @@ extension PhotoSpec {
         visa("turkey-visa", "Turkey", "土耳其", 50, 60, CGSize(width: 590, height: 709), 0.56, 0.70, [.white], maxFileKB: 500),
         visa("uae-visa", "United Arab Emirates", "阿联酋", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white], maxFileKB: 500),
         visa("saudi-visa", "Saudi Arabia", "沙特阿拉伯", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white], maxFileKB: 500),
+        visa("qatar-visa", "Qatar", "卡塔尔", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white], maxFileKB: 500),
+        visa("kuwait-visa", "Kuwait", "科威特", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white], maxFileKB: 500),
+        visa("oman-visa", "Oman", "阿曼", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white], maxFileKB: 500),
+        visa("bahrain-visa", "Bahrain", "巴林", 40, 60, CGSize(width: 472, height: 709), 0.52, 0.70, [.white], maxFileKB: 500),
         visa("brazil-visa", "Brazil", "巴西", 50, 70, CGSize(width: 591, height: 827), 0.44, 0.60, [.white], maxFileKB: 1024),
         visa("mexico-visa", "Mexico", "墨西哥", 35, 45, CGSize(width: 413, height: 531), 0.64, 0.78, [.white], maxFileKB: 500),
         visa("russia-visa", "Russia", "俄罗斯", 35, 45, CGSize(width: 413, height: 531), 0.64, 0.78, [.white, .lightGray], maxFileKB: 500),
@@ -731,7 +769,13 @@ extension PhotoSpec {
         makeSpec(id: "canada-pr", country: "Canada", localizedCountry: "加拿大", title: "Canada PR Card", localizedTitle: "加拿大枫叶卡", category: .immigration, widthMM: 50, heightMM: 70, pixelSize: CGSize(width: 600, height: 840), minHeadRatio: 0.44, maxHeadRatio: 0.52, backgrounds: [.white, .offWhite], maxFileKB: 500, notes: commonNotes("50 x 70 mm", background: "white or light background"), zhNotes: commonZhNotes("50 x 70 毫米", background: "白色或浅色背景")),
         makeSpec(id: "uk-immigration", country: "United Kingdom", localizedCountry: "英国", title: "UK Immigration Photo", localizedTitle: "英国移民照片", category: .immigration, widthMM: 35, heightMM: 45, pixelSize: CGSize(width: 600, height: 750), minHeadRatio: 0.64, maxHeadRatio: 0.80, backgrounds: [.lightGray, .offWhite], maxFileKB: 500, notes: commonNotes("35 x 45 mm", background: "light grey or cream background"), zhNotes: commonZhNotes("35 x 45 毫米", background: "浅灰或米色背景")),
         makeSpec(id: "australia-immigration", country: "Australia", localizedCountry: "澳大利亚", title: "Australia Immigration Photo", localizedTitle: "澳大利亚移民照片", category: .immigration, widthMM: 35, heightMM: 45, pixelSize: CGSize(width: 420, height: 540), minHeadRatio: 0.64, maxHeadRatio: 0.80, backgrounds: [.white, .offWhite], maxFileKB: 500, notes: commonNotes("35 x 45 mm", background: "plain light background"), zhNotes: commonZhNotes("35 x 45 毫米", background: "浅色纯色背景")),
-        makeSpec(id: "eu-residence-permit", country: "European Union", localizedCountry: "欧盟", title: "EU Residence Permit", localizedTitle: "欧盟居留许可", category: .immigration, widthMM: 35, heightMM: 45, pixelSize: CGSize(width: 413, height: 531), minHeadRatio: 0.70, maxHeadRatio: 0.80, backgrounds: [.white, .lightGray], maxFileKB: 500, notes: commonNotes("35 x 45 mm", background: "plain light background"), zhNotes: commonZhNotes("35 x 45 毫米", background: "浅色纯色背景"))
+        makeSpec(id: "eu-residence-permit", country: "European Union", localizedCountry: "欧盟", title: "EU Residence Permit", localizedTitle: "欧盟居留许可", category: .immigration, widthMM: 35, heightMM: 45, pixelSize: CGSize(width: 413, height: 531), minHeadRatio: 0.70, maxHeadRatio: 0.80, backgrounds: [.white, .lightGray], maxFileKB: 500, notes: commonNotes("35 x 45 mm", background: "plain light background"), zhNotes: commonZhNotes("35 x 45 毫米", background: "浅色纯色背景")),
+        makeSpec(id: "saudi-iqama", country: "Saudi Arabia", localizedCountry: "沙特阿拉伯", title: "Saudi Iqama", localizedTitle: "沙特 Iqama 居留证", category: .immigration, widthMM: 40, heightMM: 60, pixelSize: CGSize(width: 472, height: 709), minHeadRatio: 0.52, maxHeadRatio: 0.70, backgrounds: [.white], maxFileKB: 500, notes: gccNotes(document: "Iqama", size: "4 x 6 cm"), zhNotes: ["4 x 6 厘米居留证照片模板", "白色纯色背景", "适合 Saudi Iqama / 居留证照片工作流", "最终提交前请核对 Absher、Muqeem 或办理渠道要求"], arCountry: "السعودية", arTitle: "صورة الإقامة السعودية", arNotes: gccArabicNotes(document: "الإقامة السعودية", size: "4 x 6 سم")),
+        makeSpec(id: "uae-emirates-id", country: "United Arab Emirates", localizedCountry: "阿联酋", title: "UAE Emirates ID", localizedTitle: "阿联酋 Emirates ID", category: .immigration, widthMM: 40, heightMM: 60, pixelSize: CGSize(width: 472, height: 709), minHeadRatio: 0.52, maxHeadRatio: 0.70, backgrounds: [.white], maxFileKB: 500, notes: gccNotes(document: "Emirates ID", size: "4 x 6 cm"), zhNotes: ["4 x 6 厘米 Emirates ID 照片模板", "白色纯色背景", "适合阿联酋 Emirates ID / 居留相关照片工作流", "最终提交前请核对 ICP 或办理渠道要求"], arCountry: "الإمارات", arTitle: "صورة الهوية الإماراتية", arNotes: gccArabicNotes(document: "الهوية الإماراتية", size: "4 x 6 سم")),
+        makeSpec(id: "qatar-residence-permit", country: "Qatar", localizedCountry: "卡塔尔", title: "Qatar Residence Permit", localizedTitle: "卡塔尔居留证", category: .immigration, widthMM: 40, heightMM: 60, pixelSize: CGSize(width: 472, height: 709), minHeadRatio: 0.52, maxHeadRatio: 0.70, backgrounds: [.white], maxFileKB: 500, notes: gccNotes(document: "Qatar residence permit", size: "4 x 6 cm"), zhNotes: ["4 x 6 厘米卡塔尔居留照片模板", "白色纯色背景", "适合 Qatar Residence Permit / 居留证照片工作流", "最终提交前请核对 Metrash 或办理渠道要求"], arCountry: "قطر", arTitle: "صورة الإقامة القطرية", arNotes: gccArabicNotes(document: "الإقامة القطرية", size: "4 x 6 سم")),
+        makeSpec(id: "kuwait-civil-id", country: "Kuwait", localizedCountry: "科威特", title: "Kuwait Civil ID", localizedTitle: "科威特 Civil ID", category: .immigration, widthMM: 40, heightMM: 60, pixelSize: CGSize(width: 472, height: 709), minHeadRatio: 0.52, maxHeadRatio: 0.70, backgrounds: [.white], maxFileKB: 500, notes: gccNotes(document: "Kuwait Civil ID", size: "4 x 6 cm"), zhNotes: ["4 x 6 厘米科威特 Civil ID 照片模板", "白色纯色背景", "适合 Kuwait Civil ID / 居留身份照片工作流", "最终提交前请核对 PACI 或办理渠道要求"], arCountry: "الكويت", arTitle: "صورة البطاقة المدنية الكويتية", arNotes: gccArabicNotes(document: "البطاقة المدنية الكويتية", size: "4 x 6 سم")),
+        makeSpec(id: "oman-residence-card", country: "Oman", localizedCountry: "阿曼", title: "Oman Residence Card", localizedTitle: "阿曼居留卡", category: .immigration, widthMM: 40, heightMM: 60, pixelSize: CGSize(width: 472, height: 709), minHeadRatio: 0.52, maxHeadRatio: 0.70, backgrounds: [.white], maxFileKB: 500, notes: gccNotes(document: "Oman residence card", size: "4 x 6 cm"), zhNotes: ["4 x 6 厘米阿曼居留卡照片模板", "白色纯色背景", "适合 Oman Residence Card / 居留卡照片工作流", "最终提交前请核对 Royal Oman Police 或办理渠道要求"], arCountry: "عُمان", arTitle: "صورة بطاقة الإقامة العمانية", arNotes: gccArabicNotes(document: "بطاقة الإقامة العمانية", size: "4 x 6 سم")),
+        makeSpec(id: "bahrain-cpr", country: "Bahrain", localizedCountry: "巴林", title: "Bahrain CPR / Residence Permit", localizedTitle: "巴林 CPR / 居留许可", category: .immigration, widthMM: 40, heightMM: 60, pixelSize: CGSize(width: 472, height: 709), minHeadRatio: 0.52, maxHeadRatio: 0.70, backgrounds: [.white], maxFileKB: 500, notes: gccNotes(document: "Bahrain CPR or residence permit", size: "4 x 6 cm"), zhNotes: ["4 x 6 厘米巴林 CPR / 居留照片模板", "白色纯色背景", "适合 Bahrain CPR 或居留许可照片工作流", "最终提交前请核对办理渠道要求"], arCountry: "البحرين", arTitle: "صورة بطاقة البحرين CPR", arNotes: gccArabicNotes(document: "بطاقة البحرين CPR أو الإقامة", size: "4 x 6 سم"))
     ]
 
     private static let printSpecs: [PhotoSpec] = [
@@ -792,6 +836,8 @@ extension PhotoSpec {
         localizedCountry: String,
         title: String,
         localizedTitle: String,
+        arCountry: String? = nil,
+        arTitle: String? = nil,
         category: SpecCategory,
         widthMM: Double,
         heightMM: Double,
@@ -802,14 +848,17 @@ extension PhotoSpec {
         maxFileKB: Int? = nil,
         source: String? = nil,
         notes: [String],
-        zhNotes: [String]
+        zhNotes: [String],
+        arNotes: [String]? = nil
     ) -> PhotoSpec {
         PhotoSpec(
             id: id,
             country: country,
             localizedCountry: localizedCountry,
+            arabicCountry: arCountry,
             title: title,
             localizedTitle: localizedTitle,
+            arabicTitle: arTitle,
             category: category,
             widthMM: widthMM,
             heightMM: heightMM,
@@ -820,7 +869,8 @@ extension PhotoSpec {
             maxFileKB: maxFileKB,
             sourceURL: source.flatMap(URL.init(string:)),
             notes: notes,
-            localizedNotes: zhNotes
+            localizedNotes: zhNotes,
+            arabicNotes: arNotes
         )
     }
 
@@ -837,6 +887,24 @@ extension PhotoSpec {
             "\(size)照片模板",
             "使用\(background)",
             "最终提交前请核对官方要求"
+        ]
+    }
+
+    private static func gccNotes(document: String, size: String) -> [String] {
+        [
+            "\(size) GCC document photo preset",
+            "Plain white background",
+            "Designed for \(document) photo workflows",
+            "Review the receiving government portal or service center before final submission"
+        ]
+    }
+
+    private static func gccArabicNotes(document: String, size: String) -> [String] {
+        [
+            "قالب صورة \(document) بمقاس \(size)",
+            "خلفية بيضاء سادة",
+            "مخصص لسير عمل صور الهوية والإقامة في الخليج",
+            "راجع البوابة الحكومية أو مركز الخدمة قبل التقديم النهائي"
         ]
     }
 }

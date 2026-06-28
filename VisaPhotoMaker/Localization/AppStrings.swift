@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum L10n {
     enum AppLanguage: String {
@@ -28,6 +29,14 @@ enum L10n {
 
     static var isChinese: Bool {
         AppLanguage.current == .chineseSimplified
+    }
+
+    static var isArabic: Bool {
+        AppLanguage.current == .arabic
+    }
+
+    static var layoutDirection: LayoutDirection {
+        isArabic ? .rightToLeft : .leftToRight
     }
 
     static func text(_ key: Key) -> String {

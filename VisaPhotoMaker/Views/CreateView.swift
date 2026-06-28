@@ -22,6 +22,7 @@ struct CreateView: View {
     private var popularCountries: [String] {
         var seen = Set<String>()
         let preferred = [
+            "Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Oman", "Bahrain",
             "United States", "United Kingdom", "Canada", "Schengen Area", "European Union",
             "Australia", "China", "India", "Japan", "South Korea", "Singapore", "New Zealand"
         ]
