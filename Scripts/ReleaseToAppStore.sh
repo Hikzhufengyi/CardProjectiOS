@@ -7,7 +7,7 @@ PROJECT_FILE="${PROJECT_PATH}/project.pbxproj"
 SCHEME="${SCHEME:-VisaPhotoMaker}"
 CONFIGURATION="${CONFIGURATION:-Release}"
 TEAM_ID="${TEAM_ID:-MAH98XTZBR}"
-BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d)}"
+BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d)01}"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
 OUTPUT_ROOT="${OUTPUT_ROOT:-${TMPDIR:-/tmp}/idphoto-appstore-upload/${RUN_ID}}"
 ARCHIVE_PATH="${OUTPUT_ROOT}/${SCHEME}.xcarchive"
@@ -22,7 +22,7 @@ Usage:
 What it does:
   1. Reads the current MARKETING_VERSION from the Xcode project.
   2. Increases the minor version by 0.1, for example 1.1 -> 1.2.
-  3. Sets CURRENT_PROJECT_VERSION to today's date, for example 20260628.
+  3. Sets CURRENT_PROJECT_VERSION to today's date plus a sequence, for example 2026062801.
   4. Archives the Release build for generic iOS device.
   5. Uploads the archive to App Store Connect.
 
@@ -31,7 +31,7 @@ Optional environment variables:
   CONFIGURATION=Release
   TEAM_ID=MAH98XTZBR
   APP_VERSION=1.5
-  BUILD_NUMBER=20260628
+  BUILD_NUMBER=2026062801
   OUTPUT_ROOT=/tmp/idphoto-appstore-upload/manual
 
 Optional App Store Connect API key authentication:
@@ -40,6 +40,8 @@ Optional App Store Connect API key authentication:
   ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 If ASC_* variables are not set, xcodebuild uses the Apple account configured in Xcode.
+For local machines where Xcode is already signed in as the Account Holder, prefer leaving
+ASC_* unset so export uses the local Xcode account and signing assets.
 EOF
 }
 
@@ -162,7 +164,7 @@ main() {
     -destination "generic/platform=iOS" \
     -archivePath "$ARCHIVE_PATH" \
     -allowProvisioningUpdates \
-    "${xcode_auth_args[@]}" \
+    ${xcode_auth_args+"${xcode_auth_args[@]}"} \
     clean archive
 
   xcodebuild \
@@ -171,7 +173,7 @@ main() {
     -exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
     -exportPath "$EXPORT_PATH" \
     -allowProvisioningUpdates \
-    "${xcode_auth_args[@]}"
+    ${xcode_auth_args+"${xcode_auth_args[@]}"}
 
   echo "Uploaded to App Store Connect."
   echo "Archive: $ARCHIVE_PATH"
