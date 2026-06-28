@@ -274,6 +274,7 @@ private struct DocumentDetailView: View {
     @State private var showingPrivacy = false
     @State private var showingCamera = false
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var showsPassedChecks = false
     @State private var gestureStartScale: CGFloat?
     @State private var gestureStartRotation: Double?
     @State private var editStateUpdateTask: Task<Void, Never>?
@@ -424,7 +425,8 @@ private struct DocumentDetailView: View {
                     PrecisionAdjustSection(
                         spec: spec,
                         selectedBackground: $selectedBackground,
-                        editState: $editState
+                        editState: $editState,
+                        showsAdvancedTone: !result.isFullyPassed
                     )
                 } else {
                     backgroundPicker
@@ -757,9 +759,44 @@ private struct DocumentDetailView: View {
                     .background(AppTheme.groupedBackground, in: RoundedRectangle(cornerRadius: 8))
                 }
 
-                ForEach(result.checks) { check in
-                    ComplianceRow(check: check) {
-                        applyFix(for: check)
+                if compactIssueChecks.isEmpty {
+                    Label(L10n.text(en: "All key checks passed. Export now or open the full report if you need to review every item.", zh: "关键检查已通过。可以直接导出，也可以展开完整报告逐项查看。", ar: "اجتازت الصورة الفحوصات الأساسية. يمكنك التصدير الآن أو فتح التقرير الكامل لمراجعة كل بند."), systemImage: "checkmark.seal.fill")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.success)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(10)
+                        .background(AppTheme.success.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                } else {
+                    ForEach(compactIssueChecks.prefix(3)) { check in
+                        ComplianceRow(check: check) {
+                            applyFix(for: check)
+                        }
+                    }
+                }
+
+                DisclosureGroup(isExpanded: $showsPassedChecks) {
+                    VStack(spacing: 10) {
+                        ForEach(result.checks.filter { $0.severity == .pass }) { check in
+                            ComplianceRow(check: check) {
+                                applyFix(for: check)
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(AppTheme.success)
+                        Text(L10n.text(en: "Passed checks", zh: "已通过检查", ar: "الفحوصات المجتازة"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.ink)
+                        Spacer(minLength: 0)
+                        Text("\(result.checks.filter { $0.severity == .pass }.count)")
+                            .font(.caption2.monospacedDigit().weight(.bold))
+                            .foregroundStyle(AppTheme.success)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(AppTheme.success.opacity(0.10), in: Capsule())
                     }
                 }
             }
@@ -3050,12 +3087,34 @@ private struct PrecisionAdjustSection: View {
     let spec: PhotoSpec
     @Binding var selectedBackground: PhotoBackground
     @Binding var editState: PhotoEditState
+    @State var showsAdvancedTone: Bool
     @State private var selectedToneControl: ToneControl = .brightness
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             BackgroundAdjustStrip(spec: spec, selectedBackground: $selectedBackground, resetButton: AnyView(resetButton))
-            ToneAdjustStrip(editState: $editState, selectedControl: $selectedToneControl)
+            DisclosureGroup(isExpanded: $showsAdvancedTone) {
+                ToneAdjustStrip(editState: $editState, selectedControl: $selectedToneControl)
+                    .padding(.top, 8)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(AppTheme.officialBlue)
+                    Text(L10n.text(en: "Advanced editing", zh: "高级编辑", ar: "تحرير متقدم"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppTheme.ink)
+                    Spacer(minLength: 0)
+                    Text(L10n.text(en: "Light · contrast · sharpness", zh: "亮度 · 对比 · 清晰度", ar: "الإضاءة · التباين · الوضوح"))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(AppTheme.secondaryInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.74)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 9)
+            .background(AppTheme.groupedBackground, in: RoundedRectangle(cornerRadius: 9))
         }
         .padding(10)
         .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: 10))

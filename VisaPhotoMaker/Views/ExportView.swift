@@ -27,6 +27,8 @@ struct ExportView: View {
     @State private var exportAlert: ExportAlert?
     @State private var didAddCreationRecord = false
     @State private var isSavingToPhotos = false
+    @State private var showsAdvancedOptions = false
+    @State private var showsFullComplianceReport = false
     @StateObject private var profile = LocalProfileStore.shared
 
     private let renderer = PhotoRenderer()
@@ -256,25 +258,28 @@ struct ExportView: View {
                     .foregroundStyle(result.isFullyPassed ? AppTheme.success : AppTheme.warning)
             }
 
-            ForEach(result.checks) { check in
-                HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: icon(for: check.severity))
-                        .foregroundStyle(color(for: check.severity))
-                        .frame(width: 18)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(check.title)
-                            .font(.subheadline.weight(.semibold))
-                        Text(check.message)
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.secondaryInk)
-                        if let action = check.action {
-                            Label(action, systemImage: "wand.and.stars")
-                                .font(.caption2)
-                                .foregroundStyle(color(for: check.severity))
-                        }
-                    }
-                    Spacer(minLength: 0)
+            if exportIssueChecks.isEmpty {
+                Label(L10n.text(en: "No blocking issues found. Use the official source if your application has special rules.", zh: "未发现阻塞问题。如申请有特殊规则，请以官方来源为准。", ar: "لم يتم العثور على مشاكل مانعة. راجع المصدر الرسمي إذا كان طلبك يتضمن شروطا خاصة."), systemImage: "checkmark.seal.fill")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.success)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(exportIssueChecks.prefix(3)) { check in
+                    complianceReportRow(check)
                 }
+            }
+
+            DisclosureGroup(isExpanded: $showsFullComplianceReport) {
+                VStack(spacing: 10) {
+                    ForEach(result.checks) { check in
+                        complianceReportRow(check)
+                    }
+                }
+                .padding(.top, 8)
+            } label: {
+                Label(L10n.text(en: "Full compliance report", zh: "完整检测报告", ar: "تقرير التوافق الكامل"), systemImage: "list.bullet.rectangle")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.ink)
             }
 
             Divider()
@@ -298,6 +303,31 @@ struct ExportView: View {
         .professionalCard()
     }
 
+    private var exportIssueChecks: [ComplianceCheck] {
+        result.blockingChecks + result.warnings
+    }
+
+    private func complianceReportRow(_ check: ComplianceCheck) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: icon(for: check.severity))
+                .foregroundStyle(color(for: check.severity))
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(check.title)
+                    .font(.subheadline.weight(.semibold))
+                Text(check.message)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.secondaryInk)
+                if let action = check.action {
+                    Label(action, systemImage: "wand.and.stars")
+                        .font(.caption2)
+                        .foregroundStyle(color(for: check.severity))
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
     private var trustSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(L10n.text(en: "Built around official published photo requirements", zh: "基于官方公开照片要求设计"), systemImage: "checkmark.seal.fill")
@@ -319,6 +349,61 @@ struct ExportView: View {
     }
 
     private var exportOptions: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L10n.text(en: "Choose Output", zh: "选择导出方式", ar: "اختر نوع التصدير"))
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.ink)
+
+                HStack(spacing: 10) {
+                    ExportModeButton(
+                        title: L10n.text(en: "Digital Photo", zh: "电子版照片", ar: "صورة رقمية"),
+                        subtitle: digitalSubtitle,
+                        systemImage: "person.crop.rectangle",
+                        isSelected: printLayout == .digitalOnly
+                    ) {
+                        printLayout = .digitalOnly
+                    }
+
+                    ExportModeButton(
+                        title: L10n.text(en: "Print Sheet", zh: "打印版照片", ar: "ورقة للطباعة"),
+                        subtitle: printSubtitle,
+                        systemImage: "printer.fill",
+                        isSelected: printLayout != .digitalOnly
+                    ) {
+                        if printLayout == .digitalOnly {
+                            printLayout = .fourBySix
+                        }
+                    }
+                }
+            }
+
+            DisclosureGroup(isExpanded: $showsAdvancedOptions) {
+                VStack(alignment: .leading, spacing: 11) {
+                    advancedExportOptions
+                }
+                .padding(.top, 8)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(AppTheme.officialBlue)
+                    Text(L10n.text(en: "More settings", zh: "更多设置", ar: "إعدادات إضافية"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.ink)
+                    Spacer(minLength: 0)
+                    Text(exportFormat.rawValue)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(AppTheme.secondaryInk)
+                }
+            }
+            .padding(10)
+            .background(AppTheme.groupedBackground, in: RoundedRectangle(cornerRadius: 9))
+        }
+        .padding(14)
+        .professionalCard()
+    }
+
+    private var advancedExportOptions: some View {
         VStack(alignment: .leading, spacing: 11) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(L10n.text(en: "Digital File", zh: "电子文件"))
@@ -429,8 +514,6 @@ struct ExportView: View {
             }
 
         }
-        .padding(14)
-        .professionalCard()
     }
 
     private var cropMarksToggle: some View {
@@ -804,6 +887,48 @@ private struct ExportLayoutOption: View {
             .overlay {
                 Capsule()
                     .stroke(isSelected ? AppTheme.officialBlue.opacity(0.45) : AppTheme.border, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ExportModeButton: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: systemImage)
+                        .font(.headline.weight(.bold))
+                    Spacer(minLength: 0)
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.subheadline.weight(.bold))
+                }
+
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+
+                Text(subtitle)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+            .padding(12)
+            .foregroundStyle(isSelected ? .white : AppTheme.ink)
+            .background(isSelected ? AppTheme.officialBlue : AppTheme.groupedBackground, in: RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isSelected ? AppTheme.officialBlue.opacity(0.35) : AppTheme.border, lineWidth: 1)
             }
         }
         .buttonStyle(.plain)
