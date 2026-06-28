@@ -8,20 +8,22 @@ struct CreateView: View {
     @State private var selectedCategory: SpecCategory? = nil
     @State private var selectedCountry: String? = nil
     @State private var searchText = ""
+    @State private var recentSpecPreference = RecentSpecPreference.load()
 
     private var filteredSpecs: [PhotoSpec] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return PhotoSpec.catalog.filter { spec in
+        let specs = PhotoSpec.catalog.filter { spec in
             let matchesCategory = selectedCategory == nil || spec.category == selectedCategory
             let matchesCountry = selectedCountry == nil || spec.country == selectedCountry
             let matchesSearch = query.isEmpty || spec.searchableText.contains(query)
             return matchesCategory && matchesCountry && matchesSearch
         }
+        return Self.sortedSpecs(specs, recent: recentSpecPreference)
     }
 
     private var popularCountries: [String] {
         var seen = Set<String>()
-        let preferred = Self.preferredCountryOrder()
+        let preferred = Self.preferredCountryOrder(recentCountry: recentSpecPreference?.country)
         let preferredExisting = preferred.filter { country in
             guard !seen.contains(country), PhotoSpec.catalog.contains(where: { $0.country == country }) else {
                 return false
@@ -37,7 +39,7 @@ struct CreateView: View {
         return preferredExisting + remaining
     }
 
-    private static func preferredCountryOrder() -> [String] {
+    private static func preferredCountryOrder(recentCountry: String? = nil) -> [String] {
         let gcc = ["Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Oman", "Bahrain"]
         let global = [
             "United States", "United Kingdom", "Canada", "Schengen Area", "European Union",
@@ -53,16 +55,22 @@ struct CreateView: View {
             || localeIdentifier.hasPrefix("ar")
             || localeIdentifier.contains("_ar")
 
+        var base: [String]
         if usesArabic || gccRegions.contains(region) {
-            return gcc + global
+            base = gcc + global
+        } else if region == "IN" {
+            base = ["India", "United Arab Emirates", "Saudi Arabia", "Qatar", "Kuwait", "Oman", "Bahrain"] + global
+        } else if region == "CN" || language.hasPrefix("zh") {
+            base = ["China", "Hong Kong", "Taiwan", "Japan", "South Korea", "Singapore", "United States", "Canada", "United Kingdom"] + gcc + global
+        } else {
+            base = global + gcc
         }
-        if region == "IN" {
-            return ["India", "United Arab Emirates", "Saudi Arabia", "Qatar", "Kuwait", "Oman", "Bahrain"] + global
+
+        if let recentCountry, !recentCountry.isEmpty {
+            base.removeAll { $0 == recentCountry }
+            base.insert(recentCountry, at: 0)
         }
-        if region == "CN" || language.hasPrefix("zh") {
-            return ["China", "Hong Kong", "Taiwan", "Japan", "South Korea", "Singapore", "United States", "Canada", "United Kingdom"] + gcc + global
-        }
-        return global + gcc
+        return base
     }
 
     private func localizedCountry(_ country: String) -> String {
@@ -89,16 +97,16 @@ struct CreateView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L10n.text(en: "Choose Document Type", zh: "选择证件类型"))
+            Text(L10n.text(en: "Choose Document Type", zh: "选择证件类型", ar: "اختر نوع المستند"))
                 .font(.system(.largeTitle, design: .default, weight: .bold))
                 .foregroundStyle(AppTheme.ink)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(L10n.text(en: "Choose an official-size preset, then check, refine, compress, and export on device.", zh: "选择官方尺寸模板，在本地完成检测、换背景、压缩和 300 DPI 导出。"))
+            Text(L10n.text(en: "Choose an official-size preset, then check, refine, compress, and export on device.", zh: "选择官方尺寸模板，在本地完成检测、换背景、压缩和 300 DPI 导出。", ar: "اختر قالبا بالمقاس الرسمي، ثم افحص وعدل واضغط وصدّر على الجهاز."))
                 .font(.subheadline)
                 .foregroundStyle(AppTheme.secondaryInk)
             HStack(spacing: 8) {
-                TrustPill(systemImage: "lock.shield.fill", text: L10n.text(en: "100% offline", zh: "本地离线处理"))
-                TrustPill(systemImage: "checkmark.seal.fill", text: L10n.text(en: "One-time purchase", zh: "一次买断"))
+                TrustPill(systemImage: "lock.shield.fill", text: L10n.text(en: "100% offline", zh: "本地离线处理", ar: "بدون رفع"))
+                TrustPill(systemImage: "checkmark.seal.fill", text: L10n.text(en: "One-time purchase", zh: "一次买断", ar: "شراء مرة واحدة"))
             }
             .padding(.top, 4)
         }
@@ -110,7 +118,7 @@ struct CreateView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField(L10n.text(en: "Search country, visa, passport, or size", zh: "搜索国家、签证、护照或尺寸"), text: $searchText)
+                TextField(L10n.text(en: "Search country, visa, passport, or size", zh: "搜索国家、签证、护照或尺寸", ar: "ابحث عن دولة أو تأشيرة أو جواز أو مقاس"), text: $searchText)
                     .textInputAutocapitalization(.never)
                 if !searchText.isEmpty {
                     Button {
@@ -120,7 +128,7 @@ struct CreateView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(L10n.text(en: "Clear search", zh: "清空搜索"))
+                    .accessibilityLabel(L10n.text(en: "Clear search", zh: "清空搜索", ar: "مسح البحث"))
                 }
             }
             .padding(12)
@@ -129,7 +137,7 @@ struct CreateView: View {
             ZStack(alignment: .trailing) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        FilterChip(title: L10n.text(en: "All Countries", zh: "常用国家"), isSelected: selectedCountry == nil) {
+                        FilterChip(title: L10n.text(en: "All Countries", zh: "常用国家", ar: "كل الدول"), isSelected: selectedCountry == nil) {
                             selectedCountry = nil
                         }
                         ForEach(popularCountries.prefix(20), id: \.self) { country in
@@ -150,7 +158,7 @@ struct CreateView: View {
         VStack(alignment: .leading, spacing: 14) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    FilterChip(title: L10n.text(en: "All", zh: "全部"), isSelected: selectedCategory == nil) {
+                    FilterChip(title: L10n.text(en: "All", zh: "全部", ar: "الكل"), isSelected: selectedCategory == nil) {
                         selectedCategory = nil
                     }
                     ForEach(SpecCategory.allCases) { category in
@@ -163,15 +171,15 @@ struct CreateView: View {
 
             if filteredSpecs.isEmpty {
                 ContentUnavailableView(
-                    L10n.text(en: "No Presets Found", zh: "没有找到规格"),
+                    L10n.text(en: "No Presets Found", zh: "没有找到规格", ar: "لم يتم العثور على قوالب"),
                     systemImage: "doc.text.magnifyingglass",
-                    description: Text(L10n.text(en: "Try another keyword, or clear country/category filters.", zh: "换一个关键词，或清除国家/分类筛选。"))
+                    description: Text(L10n.text(en: "Try another keyword, or clear country/category filters.", zh: "换一个关键词，或清除国家/分类筛选。", ar: "جرّب كلمة أخرى أو امسح فلتر الدولة أو الفئة."))
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 34)
             } else {
                 HStack {
-                    Text(L10n.text(en: "\(filteredSpecs.count) presets", zh: "\(filteredSpecs.count) 个模板"))
+                    Text(L10n.text(en: "\(filteredSpecs.count) presets", zh: "\(filteredSpecs.count) 个模板", ar: "\(filteredSpecs.count) قالب"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -185,10 +193,62 @@ struct CreateView: View {
                             SpecCard(spec: spec)
                         }
                         .buttonStyle(.plain)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            remember(spec)
+                        })
                     }
                 }
             }
         }
+    }
+
+    private func remember(_ spec: PhotoSpec) {
+        let preference = RecentSpecPreference(spec: spec)
+        recentSpecPreference = preference
+        preference.save()
+    }
+
+    private static func sortedSpecs(_ specs: [PhotoSpec], recent: RecentSpecPreference?) -> [PhotoSpec] {
+        guard let recent else { return specs }
+        return specs.sorted { left, right in
+            let leftScore = recent.score(for: left)
+            let rightScore = recent.score(for: right)
+            if leftScore != rightScore { return leftScore > rightScore }
+            return left.displayTitle.localizedStandardCompare(right.displayTitle) == .orderedAscending
+        }
+    }
+}
+
+private struct RecentSpecPreference: Codable {
+    private static let storageKey = "recentSpecPreference.v1"
+
+    let specID: String
+    let country: String
+    let category: SpecCategory
+    let selectedAt: Date
+
+    init(spec: PhotoSpec) {
+        self.specID = spec.id
+        self.country = spec.country
+        self.category = spec.category
+        self.selectedAt = Date()
+    }
+
+    func score(for spec: PhotoSpec) -> Int {
+        if spec.id == specID { return 300 }
+        if spec.country == country { return 200 }
+        if spec.category == category { return 40 }
+        return 0
+    }
+
+    func save() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        UserDefaults.standard.set(data, forKey: Self.storageKey)
+    }
+
+    static func load() -> RecentSpecPreference? {
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return nil }
+        return try? JSONDecoder().decode(RecentSpecPreference.self, from: data)
     }
 }
 

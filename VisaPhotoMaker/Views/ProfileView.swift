@@ -44,7 +44,7 @@ struct ProfileView: View {
                 Button {
                     showingPaywall = true
                 } label: {
-                    Label(L10n.text(en: "Unlock Lifetime", zh: "解锁终身版"), systemImage: "lock.open.fill")
+                    Label(L10n.text(en: "Unlock Lifetime", zh: "解锁终身版", ar: "فتح الوصول مدى الحياة"), systemImage: "lock.open.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.officialBlue)
@@ -54,7 +54,7 @@ struct ProfileView: View {
             Button {
                 Task { await store.restore() }
             } label: {
-                Label(L10n.text(en: "Restore Purchase", zh: "恢复购买"), systemImage: "arrow.clockwise")
+                Label(L10n.text(en: "Restore Purchase", zh: "恢复购买", ar: "استعادة الشراء"), systemImage: "arrow.clockwise")
             }
             .disabled(store.isPurchasing)
 
@@ -74,9 +74,9 @@ struct ProfileView: View {
                     .foregroundStyle(AppTheme.danger)
             }
         } header: {
-            Text(L10n.text(en: "Pro Access", zh: "专业版"))
+            Text(L10n.text(en: "Pro Access", zh: "专业版", ar: "الوصول الاحترافي"))
         } footer: {
-            Text(L10n.text(en: "Purchases and restore are handled by the App Store. Your photos are not uploaded.", zh: "购买和恢复购买只通过 App Store 完成，不会上传你的照片。"))
+            Text(L10n.text(en: "Purchases and restore are handled by the App Store. Your photos are not uploaded.", zh: "购买和恢复购买只通过 App Store 完成，不会上传你的照片。", ar: "تتم عمليات الشراء والاستعادة عبر App Store. لا يتم رفع صورك."))
         }
     }
 
@@ -88,18 +88,18 @@ struct ProfileView: View {
                     .foregroundStyle(AppTheme.officialBlue)
                     .frame(width: 32)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(L10n.text(en: "Private, Secure, Compliant", zh: "安全、隐私、合规"))
+                    Text(L10n.text(en: "Private, Secure, Compliant", zh: "安全、隐私、合规", ar: "خصوصي وآمن ومتوافق"))
                         .font(.headline)
                         .foregroundStyle(AppTheme.ink)
-                    Text(L10n.text(en: "Photo processing happens on device. Compliance checks are based on published requirements; review the official source before submission.", zh: "照片处理在设备本地完成，不上传云端。合规检查基于公开证件照要求，导出前仍建议核对官方页面。"))
+                    Text(L10n.text(en: "Photo processing happens on device. Compliance checks are based on published requirements; review the official source before submission.", zh: "照片处理在设备本地完成，不上传云端。合规检查基于公开证件照要求，导出前仍建议核对官方页面。", ar: "تتم معالجة الصور على الجهاز. تستند الفحوصات إلى المتطلبات المنشورة؛ راجع المصدر الرسمي قبل التقديم."))
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryInk)
                 }
             }
 
-            Label(L10n.text(en: "Photos are not uploaded to a server", zh: "照片不会上传服务器"), systemImage: "icloud.slash")
-            Label(L10n.text(en: "No ad SDKs, fewer distractions", zh: "无广告 SDK，少打扰"), systemImage: "hand.raised")
-            Label(L10n.text(en: "Local records stay on this device", zh: "本地制作记录只保存在本机"), systemImage: "internaldrive")
+            Label(L10n.text(en: "Photos are not uploaded to a server", zh: "照片不会上传服务器", ar: "لا يتم رفع الصور إلى خادم"), systemImage: "icloud.slash")
+            Label(L10n.text(en: "No ad SDKs, fewer distractions", zh: "无广告 SDK，少打扰", ar: "بدون SDK إعلانات وتشتيت أقل"), systemImage: "hand.raised")
+            Label(L10n.text(en: "Local records stay on this device", zh: "本地制作记录只保存在本机", ar: "تبقى السجلات المحلية على هذا الجهاز"), systemImage: "internaldrive")
 
             Button {
                 showingPrivacy = true
@@ -116,19 +116,19 @@ struct ProfileView: View {
             Button {
                 AppStoreReviewService.openWriteReview()
             } label: {
-                Label(L10n.text(en: "Rate IDPhoto Pro", zh: "给 IDPhoto Pro 评分"), systemImage: "star")
+                Label(L10n.text(en: "Rate IDPhoto Pro", zh: "给 IDPhoto Pro 评分", ar: "قيّم IDPhoto Pro"), systemImage: "star")
             }
 
             LabeledContent {
                 Text(appVersionText)
                     .foregroundStyle(AppTheme.secondaryInk)
             } label: {
-                Label(L10n.text(en: "Version", zh: "版本号"), systemImage: "info.circle")
+                Label(L10n.text(en: "Version", zh: "版本号", ar: "الإصدار"), systemImage: "info.circle")
             }
         } header: {
-            Text(L10n.text(en: "Trust & Support", zh: "信任与支持"))
+            Text(L10n.text(en: "Trust & Support", zh: "信任与支持", ar: "الثقة والدعم"))
         } footer: {
-            Text(L10n.text(en: "IDPhoto Pro is not a government agency. Checks are assistive; verify official requirements before final submission.", zh: "IDPhoto Pro 不是政府机构，检查结果仅作辅助，最终提交前请核对对应国家/地区的官方要求。"))
+            Text(L10n.text(en: "IDPhoto Pro is not a government agency. Checks are assistive; verify official requirements before final submission.", zh: "IDPhoto Pro 不是政府机构，检查结果仅作辅助，最终提交前请核对对应国家/地区的官方要求。", ar: "IDPhoto Pro ليس جهة حكومية. الفحوصات للمساعدة فقط؛ تحقق من المتطلبات الرسمية قبل التقديم النهائي."))
         }
     }
 
@@ -152,7 +152,7 @@ struct ProfileView: View {
                         Text(L10n.text(L10n.records))
                             .font(.headline)
                             .foregroundStyle(AppTheme.ink)
-                        Text(profile.records.isEmpty ? (L10n.text(en: "No records yet", zh: "暂无记录")) : (L10n.text(en: "\(profile.records.count) local records", zh: "\(profile.records.count) 条本地记录")))
+                        Text(profile.records.isEmpty ? (L10n.text(en: "No records yet", zh: "暂无记录", ar: "لا توجد سجلات بعد")) : (L10n.text(en: "\(profile.records.count) local records", zh: "\(profile.records.count) 条本地记录", ar: "\(profile.records.count) سجل محلي")))
                             .font(.caption)
                             .foregroundStyle(AppTheme.secondaryInk)
                     }
@@ -161,7 +161,7 @@ struct ProfileView: View {
         } header: {
             Text(L10n.text(L10n.records))
         } footer: {
-            Text(L10n.text(en: "Local records can be saved again and are never synced to the cloud.", zh: "本地制作记录可二次保存，不会同步到云端。"))
+            Text(L10n.text(en: "Local records can be saved again and are never synced to the cloud.", zh: "本地制作记录可二次保存，不会同步到云端。", ar: "يمكن حفظ السجلات المحلية مرة أخرى ولا تتم مزامنتها مع السحابة."))
         }
     }
 }
@@ -182,10 +182,10 @@ private struct MembershipIdentityCard: View {
                 .frame(width: 46, height: 46)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(hasProAccess ? L10n.text(en: "Pro Member", zh: "尊贵专业会员") : L10n.text(en: "Free Member", zh: "免费用户"))
+                    Text(hasProAccess ? L10n.text(en: "Pro Member", zh: "尊贵专业会员", ar: "عضو احترافي") : L10n.text(en: "Free Member", zh: "免费用户", ar: "عضو مجاني"))
                         .font(.title3.weight(.bold))
                         .foregroundStyle(AppTheme.ink)
-                    Text(hasProAccess ? L10n.text(en: "Lifetime access is active. HD export, PDF, print layouts, compression, and compliance reports are unlocked.", zh: "终身版已生效。高清导出、PDF、打印排版、压缩和合规报告已解锁。") : L10n.text(en: "Preview and check photos for free. Unlock once when you are ready to export final files.", zh: "可以免费预览和检测照片。确认需要导出最终文件时再一次买断解锁。"))
+                    Text(hasProAccess ? L10n.text(en: "Lifetime access is active. HD export, PDF, print layouts, compression, and compliance reports are unlocked.", zh: "终身版已生效。高清导出、PDF、打印排版、压缩和合规报告已解锁。", ar: "الوصول مدى الحياة مفعّل. تم فتح التصدير عالي الجودة وPDF وتخطيطات الطباعة والضغط وتقارير التوافق.") : L10n.text(en: "Preview and check photos for free. Unlock once when you are ready to export final files.", zh: "可以免费预览和检测照片。确认需要导出最终文件时再一次买断解锁。", ar: "عاين وافحص الصور مجانا. افتح النسخة مرة واحدة عندما تريد تصدير الملفات النهائية."))
                         .font(.caption)
                         .foregroundStyle(AppTheme.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
@@ -195,9 +195,9 @@ private struct MembershipIdentityCard: View {
             }
 
             HStack(spacing: 8) {
-                ProfileTrustPill(title: hasProAccess ? L10n.text(en: "Lifetime", zh: "终身版") : L10n.text(en: "Not unlocked", zh: "未解锁"), systemImage: hasProAccess ? "checkmark.seal" : "lock")
-                ProfileTrustPill(title: L10n.text(en: "No Ads", zh: "无广告"), systemImage: "nosign")
-                ProfileTrustPill(title: L10n.text(en: "On-device", zh: "本地处理"), systemImage: "iphone.gen3")
+                ProfileTrustPill(title: hasProAccess ? L10n.text(en: "Lifetime", zh: "终身版", ar: "مدى الحياة") : L10n.text(en: "Not unlocked", zh: "未解锁", ar: "غير مفتوح"), systemImage: hasProAccess ? "checkmark.seal" : "lock")
+                ProfileTrustPill(title: L10n.text(en: "No Ads", zh: "无广告", ar: "بدون إعلانات"), systemImage: "nosign")
+                ProfileTrustPill(title: L10n.text(en: "On-device", zh: "本地处理", ar: "على الجهاز"), systemImage: "iphone.gen3")
             }
         }
         .padding(.vertical, 4)
@@ -228,9 +228,9 @@ private struct CreationRecordsView: View {
         List {
             if profile.records.isEmpty {
                 ContentUnavailableView(
-                    L10n.text(en: "No Records", zh: "暂无制作记录"),
+                    L10n.text(en: "No Records", zh: "暂无制作记录", ar: "لا توجد سجلات"),
                     systemImage: "clock",
-                    description: Text(L10n.text(en: "Export or save a photo to keep a local record on this device.", zh: "导出或保存证件照后，会在本机保存记录。"))
+                    description: Text(L10n.text(en: "Export or save a photo to keep a local record on this device.", zh: "导出或保存证件照后，会在本机保存记录。", ar: "صدّر أو احفظ صورة للاحتفاظ بسجل محلي على هذا الجهاز."))
                 )
                 .frame(maxWidth: .infinity)
                 .listRowBackground(Color.clear)
@@ -244,14 +244,14 @@ private struct CreationRecordsView: View {
                         }
                     }
                 } footer: {
-                    Text(L10n.text(en: "Records are stored on this device only and are not uploaded.", zh: "记录只保存在本机，不上传云端。"))
+                    Text(L10n.text(en: "Records are stored on this device only and are not uploaded.", zh: "记录只保存在本机，不上传云端。", ar: "تُحفظ السجلات على هذا الجهاز فقط ولا يتم رفعها."))
                 }
 
                 Section {
                     Button(role: .destructive) {
                         profile.clearRecords()
                     } label: {
-                        Label(L10n.text(en: "Clear Local Records", zh: "清空本地记录"), systemImage: "trash")
+                        Label(L10n.text(en: "Clear Local Records", zh: "清空本地记录", ar: "مسح السجلات المحلية"), systemImage: "trash")
                     }
                 }
             }
@@ -347,17 +347,17 @@ private struct CreationRecordDetailView: View {
         ) { result in
             switch result {
             case .success:
-                saveMessage = L10n.text(en: "File saved again.", zh: "文件已再次保存。")
+                saveMessage = L10n.text(en: "File saved again.", zh: "文件已再次保存。", ar: "تم حفظ الملف مرة أخرى.")
                 saveError = nil
             case .failure(let error):
                 saveError = error.localizedDescription
             }
         }
-        .alert(L10n.text(en: "Save Failed", zh: "保存失败"), isPresented: Binding(
+        .alert(L10n.text(en: "Save Failed", zh: "保存失败", ar: "فشل الحفظ"), isPresented: Binding(
             get: { saveError != nil },
             set: { if !$0 { saveError = nil } }
         )) {
-            Button(L10n.text(en: "OK", zh: "好的"), role: .cancel) {}
+            Button(L10n.text(en: "OK", zh: "好的", ar: "حسنا"), role: .cancel) {}
         } message: {
             Text(saveError ?? "")
         }
@@ -365,7 +365,7 @@ private struct CreationRecordDetailView: View {
 
     private var preview: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.text(en: "Exported Photo", zh: "历史导出照片"))
+            Text(L10n.text(en: "Exported Photo", zh: "历史导出照片", ar: "الصورة المصدرة"))
                 .font(.headline)
 
             ZStack {
@@ -378,9 +378,9 @@ private struct CreationRecordDetailView: View {
                         .padding(12)
                 } else {
                     ContentUnavailableView(
-                        L10n.text(en: "Photo Not Found", zh: "照片文件不存在"),
+                        L10n.text(en: "Photo Not Found", zh: "照片文件不存在", ar: "الصورة غير موجودة"),
                         systemImage: "photo.badge.exclamationmark",
-                        description: Text(L10n.text(en: "The record exists, but the local image file may have been removed.", zh: "这条记录仍在，但本地图片文件可能已被清理。"))
+                        description: Text(L10n.text(en: "The record exists, but the local image file may have been removed.", zh: "这条记录仍在，但本地图片文件可能已被清理。", ar: "السجل موجود، لكن ملف الصورة المحلي ربما تمت إزالته."))
                     )
                 }
             }
@@ -394,13 +394,13 @@ private struct CreationRecordDetailView: View {
 
     private var actions: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.text(en: "Save Again", zh: "二次保存"))
+            Text(L10n.text(en: "Save Again", zh: "二次保存", ar: "حفظ مرة أخرى"))
                 .font(.headline)
 
             Button {
                 saveAgainToPhotos()
             } label: {
-                Label(L10n.text(en: "Save to Photos Again", zh: "再次保存到相册"), systemImage: "square.and.arrow.down")
+                Label(L10n.text(en: "Save to Photos Again", zh: "再次保存到相册", ar: "حفظ في الصور مرة أخرى"), systemImage: "square.and.arrow.down")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
             }
@@ -412,7 +412,7 @@ private struct CreationRecordDetailView: View {
                 Button {
                     shareRecordFile()
                 } label: {
-                    Label(L10n.text(en: "Share", zh: "分享"), systemImage: "square.and.arrow.up")
+                    Label(L10n.text(en: "Share", zh: "分享", ar: "مشاركة"), systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -422,7 +422,7 @@ private struct CreationRecordDetailView: View {
                 Button {
                     exportRecordFile()
                 } label: {
-                    Label(L10n.text(en: "Files", zh: "存文件"), systemImage: "folder.badge.plus")
+                    Label(L10n.text(en: "Files", zh: "存文件", ar: "الملفات"), systemImage: "folder.badge.plus")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -442,14 +442,14 @@ private struct CreationRecordDetailView: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.text(en: "Export Details", zh: "导出信息"))
+            Text(L10n.text(en: "Export Details", zh: "导出信息", ar: "تفاصيل التصدير"))
                 .font(.headline)
 
-            LabeledContent(L10n.text(en: "Country", zh: "国家/地区"), value: record.country)
-            LabeledContent(L10n.text(en: "Format", zh: "格式"), value: record.format)
-            LabeledContent(L10n.text(en: "Layout", zh: "版式"), value: record.layout)
-            LabeledContent(L10n.text(en: "Date", zh: "时间"), value: record.createdAt.formatted(date: .abbreviated, time: .shortened))
-            LabeledContent(L10n.text(en: "Export File", zh: "导出文件"), value: profile.fileURL(for: record) == nil ? (L10n.text(en: "Not saved", zh: "未保存")) : (L10n.text(en: "Saved locally", zh: "已保存在本机")))
+            LabeledContent(L10n.text(en: "Country", zh: "国家/地区", ar: "الدولة"), value: record.country)
+            LabeledContent(L10n.text(en: "Format", zh: "格式", ar: "الصيغة"), value: record.format)
+            LabeledContent(L10n.text(en: "Layout", zh: "版式", ar: "التخطيط"), value: record.layout)
+            LabeledContent(L10n.text(en: "Date", zh: "时间", ar: "التاريخ"), value: record.createdAt.formatted(date: .abbreviated, time: .shortened))
+            LabeledContent(L10n.text(en: "Export File", zh: "导出文件", ar: "ملف التصدير"), value: profile.fileURL(for: record) == nil ? (L10n.text(en: "Not saved", zh: "未保存", ar: "غير محفوظ")) : (L10n.text(en: "Saved locally", zh: "已保存在本机", ar: "محفوظ محليا")))
         }
         .padding(14)
         .professionalCard()
@@ -495,7 +495,7 @@ private struct CreationRecordDetailView: View {
         saver.save(image) { result in
             switch result {
             case .success:
-                saveMessage = L10n.text(en: "Saved to Photos again.", zh: "已再次保存到相册。")
+                saveMessage = L10n.text(en: "Saved to Photos again.", zh: "已再次保存到相册。", ar: "تم الحفظ في الصور مرة أخرى.")
                 saveError = nil
             case .failure(let error):
                 saveError = error.localizedDescription

@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum SpecCategory: String, CaseIterable, Identifiable {
+enum SpecCategory: String, CaseIterable, Identifiable, Codable {
     case passport = "Passport"
     case visa = "Visa"
     case immigration = "Immigration"
@@ -15,6 +15,14 @@ enum SpecCategory: String, CaseIterable, Identifiable {
             case .visa: return "签证"
             case .immigration: return "移民"
             case .print: return "打印"
+            }
+        }
+        if L10n.isArabic {
+            switch self {
+            case .passport: return "جواز السفر"
+            case .visa: return "تأشيرة"
+            case .immigration: return "الإقامة"
+            case .print: return "طباعة"
             }
         }
         return rawValue
@@ -97,7 +105,7 @@ struct PhotoSpec: Identifiable, Hashable {
             return localizedCountry ?? country
         }
         if L10n.isArabic {
-            return arabicCountry ?? country
+            return arabicCountry ?? PhotoSpec.arabicCountryName(for: country) ?? country
         }
         return country
     }
@@ -107,7 +115,7 @@ struct PhotoSpec: Identifiable, Hashable {
             return localizedTitle ?? title
         }
         if L10n.isArabic {
-            return arabicTitle ?? title
+            return arabicTitle ?? PhotoSpec.generatedArabicTitle(for: self) ?? title
         }
         return title
     }
@@ -519,18 +527,129 @@ enum PhotoBackground: String, CaseIterable, Identifiable {
     }
 
     var localizedName: String {
-        guard L10n.isChinese else { return rawValue }
-        switch self {
-        case .white: return "白色"
-        case .offWhite: return "米白色"
-        case .lightGray: return "浅灰色"
-        case .blue: return "蓝色"
+        if L10n.isChinese {
+            switch self {
+            case .white: return "白色"
+            case .offWhite: return "米白色"
+            case .lightGray: return "浅灰色"
+            case .blue: return "蓝色"
+            }
         }
+        if L10n.isArabic {
+            switch self {
+            case .white: return "أبيض"
+            case .offWhite: return "أبيض مائل"
+            case .lightGray: return "رمادي فاتح"
+            case .blue: return "أزرق"
+            }
+        }
+        return rawValue
     }
 }
 
 extension PhotoSpec {
     static let catalog: [PhotoSpec] = popularSpecs + passportSpecs + visaSpecs + immigrationSpecs + printSpecs
+
+    fileprivate static func arabicCountryName(for country: String) -> String? {
+        arabicCountryNames[country]
+    }
+
+    fileprivate static func generatedArabicTitle(for spec: PhotoSpec) -> String? {
+        if spec.country == "Print" {
+            return arabicPrintTitle(for: spec.title)
+        }
+
+        guard let country = arabicCountryName(for: spec.country) else { return nil }
+        switch spec.category {
+        case .passport:
+            return "صورة جواز سفر \(country)"
+        case .visa:
+            return "صورة تأشيرة \(country)"
+        case .immigration:
+            return "صورة إقامة \(country)"
+        case .print:
+            return arabicPrintTitle(for: spec.title)
+        }
+    }
+
+    private static func arabicPrintTitle(for title: String) -> String? {
+        if title.contains("2 x 2") { return "صورة 2 x 2 بوصة" }
+        if title.contains("1 x 1") { return "صورة 1 x 1 بوصة" }
+        if title.contains("35 x 45") { return "صورة 35 x 45 مم" }
+        if title.contains("33 x 48") { return "صورة 33 x 48 مم" }
+        if title.contains("40 x 50") { return "صورة 40 x 50 مم" }
+        if title.contains("50 x 70") { return "صورة 50 x 70 مم" }
+        if title.contains("Square Digital") { return "ملف رقمي مربع" }
+        if title.contains("Profile Headshot") { return "صورة شخصية نظيفة" }
+        return nil
+    }
+
+    private static let arabicCountryNames: [String: String] = [
+        "Argentina": "الأرجنتين",
+        "Australia": "أستراليا",
+        "Austria": "النمسا",
+        "Bahrain": "البحرين",
+        "Belgium": "بلجيكا",
+        "Brazil": "البرازيل",
+        "Bulgaria": "بلغاريا",
+        "Canada": "كندا",
+        "Chile": "تشيلي",
+        "China": "الصين",
+        "Colombia": "كولومبيا",
+        "Croatia": "كرواتيا",
+        "Czech Republic": "التشيك",
+        "Denmark": "الدنمارك",
+        "Estonia": "إستونيا",
+        "European Union": "الاتحاد الأوروبي",
+        "Finland": "فنلندا",
+        "France": "فرنسا",
+        "Germany": "ألمانيا",
+        "Greece": "اليونان",
+        "Hong Kong": "هونغ كونغ",
+        "Hungary": "المجر",
+        "Iceland": "آيسلندا",
+        "India": "الهند",
+        "Indonesia": "إندونيسيا",
+        "Ireland": "أيرلندا",
+        "Israel": "إسرائيل",
+        "Italy": "إيطاليا",
+        "Japan": "اليابان",
+        "Kuwait": "الكويت",
+        "Latvia": "لاتفيا",
+        "Lithuania": "ليتوانيا",
+        "Malaysia": "ماليزيا",
+        "Mexico": "المكسيك",
+        "Netherlands": "هولندا",
+        "New Zealand": "نيوزيلندا",
+        "Norway": "النرويج",
+        "Oman": "عُمان",
+        "Peru": "بيرو",
+        "Philippines": "الفلبين",
+        "Poland": "بولندا",
+        "Portugal": "البرتغال",
+        "Print": "طباعة",
+        "Qatar": "قطر",
+        "Romania": "رومانيا",
+        "Russia": "روسيا",
+        "Saudi Arabia": "السعودية",
+        "Schengen Area": "منطقة شنغن",
+        "Singapore": "سنغافورة",
+        "Slovakia": "سلوفاكيا",
+        "Slovenia": "سلوفينيا",
+        "South Africa": "جنوب أفريقيا",
+        "South Korea": "كوريا الجنوبية",
+        "Spain": "إسبانيا",
+        "Sweden": "السويد",
+        "Switzerland": "سويسرا",
+        "Taiwan": "تايوان",
+        "Thailand": "تايلاند",
+        "Turkey": "تركيا",
+        "Ukraine": "أوكرانيا",
+        "United Arab Emirates": "الإمارات",
+        "United Kingdom": "المملكة المتحدة",
+        "United States": "الولايات المتحدة",
+        "Vietnam": "فيتنام"
+    ]
 
     private static let popularSpecs: [PhotoSpec] = [
         makeSpec(
