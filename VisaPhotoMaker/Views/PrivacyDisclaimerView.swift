@@ -7,7 +7,7 @@ struct PrivacyDisclaimerView: View {
     @State private var isLoading = true
     @State private var loadError: String?
 
-    private let privacyURL = URL(string: "https://hikzhufengyi.github.io/idphoto-pro/privacy.html")!
+    private let privacyURL = URL(string: "https://www.passportidphoto.com/en/privacy")!
 
     var body: some View {
         NavigationStack {

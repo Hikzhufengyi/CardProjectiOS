@@ -21,11 +21,7 @@ struct CreateView: View {
 
     private var popularCountries: [String] {
         var seen = Set<String>()
-        let preferred = [
-            "Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Oman", "Bahrain",
-            "United States", "United Kingdom", "Canada", "Schengen Area", "European Union",
-            "Australia", "China", "India", "Japan", "South Korea", "Singapore", "New Zealand"
-        ]
+        let preferred = Self.preferredCountryOrder()
         let preferredExisting = preferred.filter { country in
             PhotoSpec.catalog.contains { $0.country == country }
         }
@@ -35,6 +31,28 @@ struct CreateView: View {
             return true
         }.sorted()
         return preferredExisting + remaining
+    }
+
+    private static func preferredCountryOrder() -> [String] {
+        let gcc = ["Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Oman", "Bahrain"]
+        let global = [
+            "United States", "United Kingdom", "Canada", "Schengen Area", "European Union",
+            "Australia", "China", "India", "Japan", "South Korea", "Singapore", "New Zealand"
+        ]
+        let language = Locale.preferredLanguages.first ?? ""
+        let region = Locale.current.region?.identifier.uppercased() ?? ""
+        let gccRegions = Set(["SA", "AE", "QA", "KW", "OM", "BH"])
+
+        if language.hasPrefix("ar") || gccRegions.contains(region) {
+            return gcc + global
+        }
+        if region == "IN" {
+            return ["India", "United Arab Emirates", "Saudi Arabia", "Qatar", "Kuwait", "Oman", "Bahrain"] + global
+        }
+        if region == "CN" || language.hasPrefix("zh") {
+            return ["China", "Hong Kong", "Taiwan", "Japan", "South Korea", "Singapore", "United States", "Canada", "United Kingdom"] + gcc + global
+        }
+        return global + gcc
     }
 
     private func localizedCountry(_ country: String) -> String {

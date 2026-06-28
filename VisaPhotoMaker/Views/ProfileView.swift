@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct ProfileView: View {
     @StateObject private var profile = LocalProfileStore.shared
     @StateObject private var store = StoreService.shared
+    @Environment(\.openURL) private var openURL
     @State private var showingPrivacy = false
     @State private var showingPaywall = false
 
@@ -104,6 +105,12 @@ struct ProfileView: View {
                 showingPrivacy = true
             } label: {
                 Label(L10n.text(L10n.privacyTitle), systemImage: "doc.text.magnifyingglass")
+            }
+
+            Button {
+                openURL(URL(string: "https://www.passportidphoto.com/en/support")!)
+            } label: {
+                Label(L10n.text(en: "Technical Support", zh: "技术支持", ar: "الدعم الفني"), systemImage: "questionmark.circle")
             }
 
             Button {
