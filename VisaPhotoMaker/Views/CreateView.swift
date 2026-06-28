@@ -23,7 +23,11 @@ struct CreateView: View {
         var seen = Set<String>()
         let preferred = Self.preferredCountryOrder()
         let preferredExisting = preferred.filter { country in
-            PhotoSpec.catalog.contains { $0.country == country }
+            guard !seen.contains(country), PhotoSpec.catalog.contains(where: { $0.country == country }) else {
+                return false
+            }
+            seen.insert(country)
+            return true
         }
         let remaining = PhotoSpec.catalog.map(\.country).filter { country in
             guard !preferredExisting.contains(country), !seen.contains(country) else { return false }
@@ -39,11 +43,17 @@ struct CreateView: View {
             "United States", "United Kingdom", "Canada", "Schengen Area", "European Union",
             "Australia", "China", "India", "Japan", "South Korea", "Singapore", "New Zealand"
         ]
-        let language = Locale.preferredLanguages.first ?? ""
+        let preferredLanguages = Locale.preferredLanguages.map { $0.lowercased() }
+        let language = preferredLanguages.first ?? ""
+        let localeIdentifier = Locale.current.identifier.lowercased()
         let region = Locale.current.region?.identifier.uppercased() ?? ""
         let gccRegions = Set(["SA", "AE", "QA", "KW", "OM", "BH"])
+        let usesArabic = L10n.isArabic
+            || preferredLanguages.contains(where: { $0.hasPrefix("ar") || $0.contains("-ar") || $0.contains("_ar") })
+            || localeIdentifier.hasPrefix("ar")
+            || localeIdentifier.contains("_ar")
 
-        if language.hasPrefix("ar") || gccRegions.contains(region) {
+        if usesArabic || gccRegions.contains(region) {
             return gcc + global
         }
         if region == "IN" {
