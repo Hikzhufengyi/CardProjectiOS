@@ -69,7 +69,7 @@ We may update this privacy policy when the app changes. The effective date will 
 
 ## 10. Contact
 
-For privacy questions, contact the developer at hikzhufengyi@163.com or use the technical support page.
+For privacy questions, contact the developer at passportidphoto.seafon@gmail.com or use the technical support page.
 
 ---
 
