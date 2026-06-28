@@ -30,6 +30,7 @@ Optional environment variables:
   SCHEME=VisaPhotoMaker
   CONFIGURATION=Release
   TEAM_ID=MAH98XTZBR
+  APP_VERSION=1.5
   BUILD_NUMBER=20260628
   OUTPUT_ROOT=/tmp/idphoto-appstore-upload/manual
 
@@ -56,6 +57,14 @@ require_command() {
 
 current_version() {
   awk -F'= ' '/MARKETING_VERSION = / {
+    gsub(/;/, "", $2)
+    print $2
+    exit
+  }' "$PROJECT_FILE"
+}
+
+current_build_number() {
+  awk -F'= ' '/CURRENT_PROJECT_VERSION = / {
     gsub(/;/, "", $2)
     print $2
     exit
@@ -123,14 +132,23 @@ main() {
     exit 1
   fi
 
+  local old_build
+  old_build="$(current_build_number)"
+
   local new_version
-  new_version="$(next_minor_version "$old_version")"
+  if [[ -n "${APP_VERSION:-}" ]]; then
+    new_version="$APP_VERSION"
+  elif [[ "$old_build" == "$BUILD_NUMBER" ]]; then
+    new_version="$old_version"
+  else
+    new_version="$(next_minor_version "$old_version")"
+  fi
 
   echo "Project: $PROJECT_PATH"
   echo "Scheme: $SCHEME"
   echo "Configuration: $CONFIGURATION"
   echo "Version: $old_version -> $new_version"
-  echo "Build: $BUILD_NUMBER"
+  echo "Build: ${old_build:-unknown} -> $BUILD_NUMBER"
   echo "Output: $OUTPUT_ROOT"
 
   update_project_versions "$new_version" "$BUILD_NUMBER"
