@@ -378,26 +378,54 @@ struct ExportView: View {
                 }
             }
 
-            DisclosureGroup(isExpanded: $showsAdvancedOptions) {
-                VStack(alignment: .leading, spacing: 11) {
-                    advancedExportOptions
+            VStack(alignment: .leading, spacing: showsAdvancedOptions ? 11 : 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        showsAdvancedOptions.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(AppTheme.officialBlue)
+                            .frame(width: 26)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(L10n.text(en: "More settings", zh: "更多设置", ar: "إعدادات إضافية"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppTheme.ink)
+                            Text(advancedSettingsSummary)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(AppTheme.secondaryInk)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.78)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Image(systemName: showsAdvancedOptions ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(AppTheme.officialBlue)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .padding(.top, 8)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(AppTheme.officialBlue)
-                    Text(L10n.text(en: "More settings", zh: "更多设置", ar: "إعدادات إضافية"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.ink)
-                    Spacer(minLength: 0)
-                    Text(exportFormat.rawValue)
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(AppTheme.secondaryInk)
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.text(en: "More export settings", zh: "更多导出设置", ar: "إعدادات تصدير إضافية"))
+                .accessibilityValue(advancedSettingsSummary)
+
+                if showsAdvancedOptions {
+                    advancedExportOptions
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-            .padding(10)
-            .background(AppTheme.groupedBackground, in: RoundedRectangle(cornerRadius: 9))
+            .padding(12)
+            .background(AppTheme.groupedBackground, in: RoundedRectangle(cornerRadius: 11))
+            .overlay {
+                RoundedRectangle(cornerRadius: 11)
+                    .stroke(showsAdvancedOptions ? AppTheme.officialBlue.opacity(0.28) : AppTheme.border, lineWidth: 1)
+            }
         }
         .padding(14)
         .professionalCard()
@@ -614,6 +642,21 @@ struct ExportView: View {
             return "\(L10n.text(en: "Digital file", zh: "电子文件")) · \(digitalSubtitle)"
         }
         return "\(L10n.text(en: "Print layout", zh: "打印排版")) · \(printSubtitle)"
+    }
+
+    private var advancedSettingsSummary: String {
+        var parts = [exportFormat.rawValue]
+        if let targetKB, exportFormat.supportsTargetKB {
+            parts.append(L10n.text(en: "under \(targetKB) KB", zh: "\(targetKB) KB 以下", ar: "أقل من \(targetKB) KB"))
+        }
+        if printLayout == .digitalOnly {
+            parts.append(L10n.text(en: "no print layout", zh: "不打印", ar: "بدون تخطيط طباعة"))
+        } else {
+            parts.append(printLayout.rawValue)
+            parts.append(packingMode == .safe ? L10n.text(en: "safe layout", zh: "安全排版", ar: "تخطيط آمن") : L10n.text(en: "compact layout", zh: "紧凑排版", ar: "تخطيط مضغوط"))
+            parts.append(showsCropMarks ? L10n.text(en: "crop marks on", zh: "含裁切线", ar: "علامات القص مفعلة") : L10n.text(en: "crop marks off", zh: "无裁切线", ar: "بدون علامات قص"))
+        }
+        return parts.joined(separator: " · ")
     }
 
     private var selectedOutputImage: UIImage? {
