@@ -361,7 +361,9 @@ private struct DocumentDetailView: View {
         .toolbar(.hidden, for: .tabBar)
         .tint(AppTheme.officialBlue)
         .safeAreaInset(edge: .bottom) {
-            exportBottomBar
+            if inputImage != nil {
+                exportBottomBar
+            }
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -431,11 +433,13 @@ private struct DocumentDetailView: View {
                 } else {
                     backgroundPicker
                 }
-                compliancePanel
-                    .id(complianceSectionID)
+                if inputImage != nil {
+                    compliancePanel
+                        .id(complianceSectionID)
+                }
             }
             .padding(18)
-            .padding(.bottom, 88)
+            .padding(.bottom, inputImage == nil ? 24 : 88)
         }
     }
 
