@@ -64,6 +64,7 @@ final class StoreService: ObservableObject {
         defer { isPurchasing = false }
 
         do {
+            AnalyticsService.logPurchaseStart(productID: product.id)
             let result = try await product.purchase()
             switch result {
             case .success(let verification):
@@ -71,6 +72,7 @@ final class StoreService: ObservableObject {
                 purchasedProductIDs.insert(transaction.productID)
                 await transaction.finish()
                 purchaseMessage = L10n.text(en: "Lifetime unlock is active.", zh: "已解锁终身版。")
+                AnalyticsService.logPurchaseSuccess(productID: transaction.productID)
             case .userCancelled, .pending:
                 break
             @unknown default:
@@ -78,6 +80,7 @@ final class StoreService: ObservableObject {
             }
         } catch {
             purchaseError = error.localizedDescription
+            AnalyticsService.logPurchaseFailure(productID: product.id, error: error.localizedDescription)
         }
     }
 
@@ -94,8 +97,10 @@ final class StoreService: ObservableObject {
             purchaseMessage = hasProAccess
                 ? (L10n.text(en: "Purchase restored.", zh: "购买已恢复。"))
                 : (L10n.text(en: "No previous purchase was found.", zh: "没有找到可恢复的购买。"))
+            AnalyticsService.logRestorePurchase(hasProAccess: hasProAccess)
         } catch {
             purchaseError = error.localizedDescription
+            AnalyticsService.logPurchaseFailure(productID: nil, error: error.localizedDescription)
         }
     }
 

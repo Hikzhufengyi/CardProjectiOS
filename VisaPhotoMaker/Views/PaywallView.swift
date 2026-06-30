@@ -42,7 +42,7 @@ struct PaywallView: View {
                     PaywallBenefit(
                         icon: "lock.shield",
                         title: L10n.text(en: "Private on-device workflow", zh: "本地隐私处理"),
-                        detail: L10n.text(en: "Photo processing runs on device, with no ad SDKs or third-party analytics.", zh: "照片处理在设备上完成，不接入广告 SDK 或第三方统计。")
+                        detail: L10n.text(en: "Photo processing runs on device. Analytics only measures product usage and never includes your photos.", zh: "照片处理在设备上完成。统计只用于了解功能使用情况，不包含你的照片。")
                     )
                 }
 

@@ -17,6 +17,7 @@ struct RootView: View {
                     .transition(.opacity)
             } else {
                 OnboardingView {
+                    AnalyticsService.logOnboardingComplete(method: "primary")
                     hasCompletedOnboarding = true
                 }
                 .transition(.opacity)

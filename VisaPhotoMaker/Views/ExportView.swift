@@ -806,6 +806,12 @@ struct ExportView: View {
                 saveMessage = L10n.text(en: "Saved to Photos.", zh: "已保存到相册。")
                 exportAlert = .success(shouldAskForRating: AppStoreReviewService.shouldPromptAfterSuccessfulExport())
                 addCreationRecord()
+                AnalyticsService.logExportSuccess(
+                    spec: spec,
+                    format: exportFormat.rawValue,
+                    layout: printLayout.rawValue,
+                    fileSizeBytes: exportData?.count
+                )
             case .failure(let error):
                 AppStoreReviewService.recordExportFailure()
                 saveMessage = error.localizedDescription

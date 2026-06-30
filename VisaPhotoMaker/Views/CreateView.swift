@@ -206,6 +206,7 @@ struct CreateView: View {
         let preference = RecentSpecPreference(spec: spec)
         recentSpecPreference = preference
         preference.save()
+        AnalyticsService.logSpecSelected(spec)
     }
 
     private static func sortedSpecs(_ specs: [PhotoSpec], recent: RecentSpecPreference?) -> [PhotoSpec] {
@@ -464,6 +465,7 @@ private struct DocumentDetailView: View {
             set: { newImage in
                 inputImage = newImage
                 if newImage != nil {
+                    AnalyticsService.logPhotoImport(source: "camera", spec: spec)
                     editState = pendingInitialCameraEditState ?? .default
                     pendingInitialCameraEditState = nil
                     pendingInitialCameraImageID = UUID()
@@ -664,6 +666,7 @@ private struct DocumentDetailView: View {
                 .buttonStyle(.plain)
 
                 Button {
+                    AnalyticsService.logPhotoImport(source: "camera_open", spec: spec)
                     showingCamera = true
                 } label: {
                     CompactActionButton(title: L10n.text(L10n.camera), systemImage: "camera.fill")
@@ -991,6 +994,7 @@ private struct DocumentDetailView: View {
                 isPreparingExport = true
                 defer { isPreparingExport = false }
                 await store.updatePurchases()
+                AnalyticsService.logExportAttempt(spec: spec, hasProAccess: store.hasProAccess)
                 if store.hasProAccess {
                     showingExport = true
                 } else {
@@ -1035,6 +1039,7 @@ private struct DocumentDetailView: View {
         }
         inputImage = loaded.preparedForIDPhotoProcessing()
         editState = .default
+        AnalyticsService.logPhotoImport(source: "photo_library", spec: spec)
     }
 
     private func suggestedInitialEditState(for image: UIImage) async -> PhotoEditState {
@@ -1801,6 +1806,7 @@ private struct DocumentDetailView: View {
         complianceImage = rendered
         renderedAnalysis = (try? await faceService.analyze(rendered)) ?? nil
         renderedAnalysisKey = analysisKey
+        AnalyticsService.logCheckComplete(spec: spec, result: result)
     }
 
     private func scheduleRenderedComplianceUpdate() {
